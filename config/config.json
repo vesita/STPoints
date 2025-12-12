@@ -28,7 +28,7 @@
     0.0,
     1.0
   ],
-  "cmaera_distortion_coefficients": [
+  "camera_distortion_coefficients": [
     0.1886972796553436,
     0.6931285160831229,
     -0.006238540420087074,
