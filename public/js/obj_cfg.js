@@ -70,6 +70,9 @@ class ObjectCategory
         Unknown3:       {color: '#008888',  size:[4.5, 1.8, 1.5]},
         Unknown4:       {color: '#008888',  size:[4.5, 1.8, 1.5]},
         Unknown5:       {color: '#008888',  size:[4.5, 1.8, 1.5]},
+        
+        // 标定板类型
+        CalibrationBoard: {color: '#ff9100ff', size:[0.6, 0.6, 0.01]},
     };
 
 

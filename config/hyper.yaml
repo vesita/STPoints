@@ -1,0 +1,54 @@
+# 统一的棋盘格配置
+caliboard:
+  rows: 6
+  cols: 7
+  square_size: 0.100  # meters (匹配数据集中的实际方格大小)
+
+
+# PnP / RANSAC settings
+pnp:
+  use_extrinsic_guess: false
+  iterationsCount: 100
+  reprojectionError: 8.0
+  confidence: 0.99
+  flags: 0
+  min_inliers: 10
+
+image:
+  corner_detection:
+    win_size: 11
+    zero_zone: -1
+    criteria:
+      max_count: 30
+      eps: 0.001
+
+lidar:
+  # 使用world_to_lidar配置激光雷达（推荐方式）
+  # 这是一个4x4的变换矩阵，将世界坐标系中的点变换到激光雷达坐标系
+  # world_to_lidar和lidar_to_world互为逆矩阵
+  # world_to_lidar: [
+  #   1.0, 0.0, 0.0, 0.0,
+  #   0.0, 1.0, 0.0, 0.0,
+  #   0.0, 0.0, 1.0, 0.0,
+  #   0.0, 0.0, 0.0, 1.0
+  # ]
+  
+  # 或者使用直接的外参矩阵配置激光雷达（向后兼容）
+  # 这是一个4x4的变换矩阵，将激光雷达坐标系中的点变换到世界坐标系
+  # 矩阵格式为 [R|t]，其中R是3x3旋转矩阵，t是3x1平移向量
+  # 最后一行通常是[0, 0, 0, 1]
+  extrinsic_matrix: [
+    1.0, 0.0, 0.0, 0.0,
+    0.0,-1.0, 0.0, 0.0,
+    0.0, 0.0,-1.0, 0.0,
+    0.0, 0.0, 0.0, 1.0
+  ]
+
+# 数据路径配置
+data_path:
+  root: "data/calib/"
+  cam_calibs: "calib/camera/"
+  lidar_calibs: "calib/"
+  camera: "camera/"
+  lidar: "lidar/"
+  label: "label/"

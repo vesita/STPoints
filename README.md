@@ -23,3 +23,22 @@
 ## 说明
 
 目前python版本刚需3.8,否则会因为兼容性问题无法启动main.py
+
+## 标定数据要求
+
+项目需要按照以下文件结构组织数据：
+
+```
+data
+└── {data_name}
+    ├── calib
+    │   └── camera
+    │       └── {camera_name}.json
+    ├── camera
+    │   └── {camera_name}
+    │       └── {frame_id}.jpg
+    ├── lidar
+    │   └── {frame_id}.pcd
+    └── label
+        └── {frame_id}.json
+```
