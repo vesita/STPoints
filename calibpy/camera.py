@@ -13,6 +13,8 @@ class Camera:
         config = get_config()
         self.intrinsic = np.array(config.camera_intrinsic).reshape(3, 3)
         self.extrinsic = np.array(config.camera_extrinsic).reshape(4, 4)
+        # 添加对相机畸变系数的支持
+        self.distortion_coefficients = np.array(config.camera_distortion_coefficients)
         self.image = Image.open(config.image)
         self.chessboard_size = (6, 7)  # 棋盘格内角点数 (宽, 高)
     

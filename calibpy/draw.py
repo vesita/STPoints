@@ -69,7 +69,7 @@ class CalibrationVisualizer:
             return np.array([])
         
         # 应用相机内参进行投影
-        camera_points_homo = (self.cam.intrinsic @ points_camera.T).T
+        camera_points_homo = (self.cam.distortion_coefficients @ self.cam.intrinsic @ points_camera.T).T
         
         # 透视除法得到图像坐标
         projected_points = camera_points_homo[:, :2] / camera_points_homo[:, 2:3]
@@ -131,7 +131,7 @@ class CalibrationVisualizer:
                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
         
         camera_matrix = self.cam.intrinsic
-        dist_coeffs = np.zeros((4, 1), dtype=np.float32)
+        dist_coeffs = self.cam.distortion_coefficients
         
         rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
         tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)

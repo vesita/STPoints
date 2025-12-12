@@ -197,8 +197,8 @@ def main():
             camera_matrix = np.array(cam.intrinsic, dtype=np.float32)
             print(f"相机内参矩阵: \n{camera_matrix}")
             
-            # 默认的畸变系数（如果没有提供的话）
-            dist_coeffs = np.zeros((4, 1), dtype=np.float32)
+            # 使用从配置文件加载的畸变系数，确保正确的形状
+            dist_coeffs = np.array(cam.distortion_coefficients, dtype=np.float32).reshape(1, -1)
             
             print("开始调用solvePnP...")
             print(f"solvePnP参数类型检查:")

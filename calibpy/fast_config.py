@@ -18,6 +18,8 @@ class Config:
             self.camera_extrinsic = config_data["camera_extrinsic"]
             self.lidar_extrinsic = config_data["lidar_extrinsic"]
             self.camera_intrinsic = config_data["camera_intrinsic"]
+            # 添加相机畸变系数的支持，默认为零值
+            self.camera_distortion_coefficients = config_data.get("camera_distortion_coefficients", [0, 0, 0, 0, 0])
             self.target_path = config_data["target_path"]
             
             # 先初始化基本配置，然后再处理Target
