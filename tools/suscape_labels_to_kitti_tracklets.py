@@ -73,7 +73,10 @@ def interpolate_one_obj(scene, obj_id):
     ynew[:,3:6] = np.mod(ynew[:,3:6]+np.pi, 2*np.pi) - np.pi  # wrap back to [-pi, pi]
     
 
-    return ynew
+    return {
+        "boxes": ynew,
+        "start_frame": start
+    }
 
 
 
@@ -89,12 +92,10 @@ def parse_suscape_trackets(rootdir, scene):
     for obj in objs:
         id, typename = obj
         # availalbe_boxes = s.get_boxes_of_obj(id)
-        boxes = interpolate_one_obj(s, id)
+        tracklet = interpolate_one_obj(s, id)
         # print(id, boxes.shape[0], len(availalbe_boxes.keys()))
-        tracklets[id] = {
-            "type": typename,
-            "boxes": boxes
-        }
+        tracklets[id] = tracklet
+        tracklets[id]['type'] = typename
     
     return tracklets
 
@@ -184,7 +185,17 @@ def write_kitti_tracklets(tracklets, output_file):
 
 
 
-
-
 if __name__ == "__main__":
-    parse_suscape_trackets("../data", "scene-000002")
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--rootdir', type=str, required=True, help='Root directory of Suscape dataset')
+    parser.add_argument('--scene', type=str, required=True, help='Scene name to process')
+    parser.add_argument('--output', type=str, required=True, help='Output KITTI tracklet XML file')
+
+    args = parser.parse_args()
+
+    tracklets = parse_suscape_trackets(args.rootdir, args.scene)
+
+    write_kitti_tracklets(tracklets, args.output)

@@ -42,163 +42,82 @@
 #
 
 import os
-import json
+#import json
 import math
 import numpy as np
-import sys
+import pypcd.pypcd as pypcd
+
+rootdir = "./data/scene-000002"
+camera = "front"
 
 
 
-def get_inv_matrix(file, v2c, rect):
-    with open(file) as f:
-        lines = f.readlines()
-        trans = [x for x in filter(lambda s: s.startswith(v2c), lines)][0]
-        
-        matrix = [m for m in map(lambda x: float(x), trans.strip().split(" ")[1:])]
-        matrix = matrix + [0,0,0,1]
-        m = np.array(matrix)
-        velo_to_cam  = m.reshape([4,4])
+# with open(os.path.join(rootdir,"calib","camera", camera+".json")) as f:
+#     calib = json.load(f)
+
+# extrinsic = np.array(calib["extrinsic"])
+# intrinsic = np.array(calib["intrinsic"])
+# extrinsic_matrix  = np.reshape(extrinsic, [4,4])
+# intrinsic_matrix  = np.reshape(intrinsic, [3,3])
 
 
-        trans = [x for x in filter(lambda s: s.startswith(rect), lines)][0]
-        matrix = [m for m in map(lambda x: float(x), trans.strip().split(" ")[1:])]        
-        m = np.array(matrix).reshape(3,3)
-        
-        m = np.concatenate((m, np.expand_dims(np.zeros(3), 1)), axis=1)
-        
-        rect = np.concatenate((m, np.expand_dims(np.array([0,0,0,1]), 0)), axis=0)        
-        
-        #print(velo_to_cam, rect)    
-        m = np.matmul(rect, velo_to_cam)
+def euler_angle_to_rotate_matrix(eu, t):
+    theta = eu
+    #Calculate rotation about x axis
+    R_x = np.array([
+        [1,       0,              0],
+        [0,       math.cos(theta[0]),   -math.sin(theta[0])],
+        [0,       math.sin(theta[0]),   math.cos(theta[0])]
+    ])
+
+    #Calculate rotation about y axis
+    R_y = np.array([
+        [math.cos(theta[1]),      0,      math.sin(theta[1])],
+        [0,                       1,      0],
+        [-math.sin(theta[1]),     0,      math.cos(theta[1])]
+    ])
+
+    #Calculate rotation about z axis
+    R_z = np.array([
+        [math.cos(theta[2]),    -math.sin(theta[2]),      0],
+        [math.sin(theta[2]),    math.cos(theta[2]),       0],
+        [0,               0,                  1]])
+
+    R = np.matmul(R_x, np.matmul(R_y, R_z))
+
+    t = t.reshape([-1,1])
+    R = np.concatenate([R,t], axis=-1)
+    R = np.concatenate([R, np.array([0,0,0,1]).reshape([1,-1])], axis=0)
+    return R
 
 
-        m = np.linalg.inv(m)
-        
-        return m
-def get_detection_inv_matrix(calib_path, frame):
-    file = os.path.join(calib_path, frame+".txt")
-    return get_inv_matrix(file, "Tr_velo_to_cam", "R0_rect")
+#rotate_matrix = euler_angle_to_rotate_matrix([0,0,math.pi/2],np.array([0,0,0]))[:3,:3]
+rotate_matrix = euler_angle_to_rotate_matrix([0,0,0],np.array([0,0,0]))[:3,:3]
+print(rotate_matrix)
 
 
+lidar_folder = rootdir + "/lidar"
 
-def get_tracking_inv_matrix(calib_path):
-    return get_inv_matrix(calib_path, "Tr_velo_cam", "R_rect")
+lidars = os.listdir(lidar_folder).sort()
 
+for l in lidars:
+    f = lidar_folder + "/" + l
+    print(f)
+    pc = pypcd.PointCloud.from_path(f)
+    frame = os.path.splitext(l)[0]
 
-def parse_one_detection_obj(inv_matrix, l):
-    words = l.strip().split(" ")
-    obj = {}
+    position =  np.stack([pc.pc_data['x'], pc.pc_data['y'], pc.pc_data['z']])
+    position = np.concatenate([position, np.ones((1,position.shape[1]))])
 
-    pos = np.array([float(words[11]), float(words[12]), float(words[13]), 1]).T
-    trans_pos = np.matmul(inv_matrix, pos)
-    #print(trans_pos)
+    pts =  np.stack([pc.pc_data['x'], 
+                    pc.pc_data['y'], 
+                    pc.pc_data['z']],
+                    axis=-1)
 
-    obj["obj_type"] = words[0]
-    obj["psr"] = {"scale": 
-                {"z":float(words[8]),    #height
-                    "x":float(words[10]),  #length
-                    "y":float(words[9])},  #width
-                    "position": {"x":trans_pos[0], "y":trans_pos[1], "z":trans_pos[2]+float(words[8])/2},
-                    "rotation": {"x":0, 
-                                "y":0,
-                                #"z": +math.pi/2 +float(words[14])}}
-                                "z": -math.pi/2 -float(words[14])}}
-    obj["obj_id"] = ""
-    return obj
+    #pts = np.matmul(pts, np.transpose(rotate_matrix))
+
+    pts = np.concatenate([pts.astype(np.float32), np.expand_dims(pc.pc_data["intensity"].astype(np.float32),-1)], axis=1)
+    #print(pts.dtype)
+    pts.tofile(rootdir+"/lidar.bin/{}.bin".format(frame))
 
 
-
-def trans_detection_label(src_label_path, src_calib_path, tgt_label_path):
-    files = os.listdir(src_label_path)
-    files.sort()
-
-    #files = [files[2], files[10]]
-    for fname in files:
-        frame, _ = os.path.splitext(fname)
-        print(frame)
-  
-        inv_m = get_detection_inv_matrix(src_calib_path, frame)
-
-        with open(os.path.join(src_label_path, fname)) as f:
-            lines = f.readlines()
-            objs = map(lambda l: parse_one_detection_obj(inv_m, l), lines)
-            filtered_objs = [x for x in objs]#[x for x in filter(lambda obj: obj["obj_type"]!='DontCare', objs)]
-            #print(filtered_objs)
-            with open(os.path.join(tgt_label_path, frame + ".json"), 'w') as outfile:
-                json.dump(filtered_objs, outfile)
-
-
-
-
-def parse_one_tracking_obj(inv_matrix, l):
-    words = l.strip().split(" ")
-    obj = {}
-    obj["obj_id"] = words[1]
-    frame = words[0]
-
-    #shift words
-    words = words[2:]
-
-    pos = np.array([float(words[11]), float(words[12]), float(words[13]), 1]).T
-    trans_pos = np.matmul(inv_matrix, pos)
-    #print(trans_pos)
-
-    obj["obj_type"] = words[0]
-    
-    obj["psr"] = {"scale": 
-                {"z":float(words[8]),    #height
-                    "x":float(words[10]),  #length
-                    "y":float(words[9])},  #width
-                    "position": {"x":trans_pos[0], "y":trans_pos[1], "z":trans_pos[2]+float(words[8])/2},
-                    "rotation": {"x":0, 
-                                "y":0,
-                                #"z": +math.pi/2 +float(words[14])}}
-                                "z": -math.pi/2 -float(words[14])}}
-    
-    return frame,obj
-
-
-def trans_tracking_label(src_label_path, src_calib_path, tgt_label_path):
-
-    inv_m = get_tracking_inv_matrix(src_calib_path)
-
-    frame_obj_map = {}
-
-    with open(src_label_path) as f:
-        lines = f.readlines()
-
-        for l in lines:
-            frame, obj = parse_one_tracking_obj(inv_m, l)
-
-            if obj["obj_type"] != 'DontCare':
-                if frame_obj_map.get(frame):
-                    frame_obj_map[frame].append(obj)
-                else:
-                    frame_obj_map[frame] = [obj]
-
-
-        for f in frame_obj_map:
-            frame = "{:06d}".format(int(f))
-            with open(os.path.join(tgt_label_path, frame + ".json"), 'w') as outfile:
-                json.dump(frame_obj_map[f], outfile)
-
-
-if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("args: <detection|tracking> src_label_path src_calib_path tgt_label_path")
-    else:
-        label_type = sys.argv[1]
-        src_label = sys.argv[2]
-        src_calib = sys.argv[3]
-        tgt_label = sys.argv[4]
-
-
-        if label_type == "detection":
-            trans_detection_label(src_label, src_calib, tgt_label)
-        elif label_type == "tracking":
-            trans_tracking_label(src_label, src_calib, tgt_label)
-        else:
-            print("args: <detection|tracking> src_label_path src_calib_path tgt_label_path")
-
-
-# for x in data-kitti-tracking/* ; do echo $x; export y=`echo $x|cut -d/ -f2`; echo $y; echo ~/anaconda3/bin/python tools/trans_kitti_labels.py  tracking ./kitti_tracking/data_tracking_label_2/training/label_02/$y.txt ./kitti_tracking/data_tracking_calib/training/calib/$y.txt data-kitti-tracking/$y/label; done

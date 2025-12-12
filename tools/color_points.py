@@ -22,7 +22,7 @@ parser.add_argument('--camera_channels', type=int, default=3, help="")
 parser.set_defaults(overwrite=True)
 parser.add_argument('--overwrite', action='store_true')
 parser.add_argument('--no-overwrite', dest='overwrite', action='store_false')
-parser.add_argument('--masks', type=str, default='.*', help="")
+parser.add_argument('--masks', type=str, default='', help="")
 
 args = parser.parse_args()
 
@@ -108,7 +108,7 @@ def color_frame(sc, frame, file):
             if os.path.exists(img_path):
                 img = Image.open(img_path)
                 img = np.asarray(img)      
-                if camera_masks[camera] is not None:
+                if camera in camera_masks:
                     img = img * camera_masks[camera]
                 imgpts, filter_in_frontview = proj_pts3d_to_img(pts, extrinsic, intrinsic)
 

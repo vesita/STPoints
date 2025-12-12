@@ -8,9 +8,9 @@ import argparse
 import copy
 
 parser = argparse.ArgumentParser(description='adjust ego pose')
-parser.add_argument('data', type=str, help="")
+parser.add_argument('--data', type=str, help="", default="/home/lie/nas/suscape_scenes_10hz")
 parser.add_argument('--lidar', type=str, default="", help="")
-parser.add_argument('--scenes', type=str, default=".*", help="")
+parser.add_argument('--scenes', type=str, default="scene-000000", help="")
 args = parser.parse_args()
 
 def draw_registration_result(source, target, transformation):
@@ -27,7 +27,7 @@ def draw_registration_result(source, target, transformation):
 
 def register_2_point_clouds(source, target, trans_init):
     """register 2 point clouds using ICP """
-    return trans_init
+    # return trans_init
 
     if trans_init is None:
         trans_init = np.identity(4)
@@ -105,13 +105,14 @@ DATA binary
 def proc_scene(scene):
     scene = SuscapeScene(args.data, scene, args.lidar)
     frames = scene.meta['frames']
-
+    
     lidars = []
     poses = []
 
     lidar_pose = np.identity(4)
     poses.append(lidar_pose)
 
+    # 
     lidar_pose_path = os.path.join(args.data, scene.name, 'lidar_pose')
     os.makedirs(lidar_pose_path, exist_ok=True)
     with open(os.path.join(lidar_pose_path, frames[0]+'.json'), 'w') as f:
@@ -126,6 +127,7 @@ def proc_scene(scene):
     lidars.append(lidar)
 
     tgt = o3d.geometry.PointCloud()
+    print(lidar.shape)
     tgt.points = o3d.utility.Vector3dVector(lidar[:, 0:3])
     tgt_pose = scene.read_ego_pose(frame)
 
@@ -168,8 +170,9 @@ def proc_scene(scene):
         trans_init = np.matmul(np.linalg.inv(ego_t_to_utm), trans_init)
         trans_init = np.matmul(np.linalg.inv(lidar_to_ego), trans_init)
 
+        print(trans_init)
         trans = register_2_point_clouds(src, tgt, trans_init)
-        # print(next_frame, trans)
+        print(next_frame, trans)
 
         lidar_pose = np.matmul(lidar_pose, trans)
         poses.append(lidar_pose)
