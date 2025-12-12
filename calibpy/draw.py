@@ -68,24 +68,73 @@ class CalibrationVisualizer:
         if len(points_camera) == 0:
             return np.array([])
         
-        # 应用相机内参进行投影
-        camera_points_homo = (self.cam.distortion_coefficients @ self.cam.intrinsic @ points_camera.T).T
+        # 先进行透视除法得到归一化图像坐标 (x/z, y/z)
+        normalized_points = points_camera[:, :2] / points_camera[:, 2:3]
         
-        # 透视除法得到图像坐标
-        projected_points = camera_points_homo[:, :2] / camera_points_homo[:, 2:3]
+        # 获取畸变系数
+        dist_coeffs = self.cam.distortion_coefficients
+        
+        # 应用畸变效果（使点云匹配相机畸变）
+        if len(dist_coeffs) >= 5 and not np.all(dist_coeffs == 0):
+            # 标准OpenCV模型 (前5个系数)
+            k1, k2, p1, p2, k3 = dist_coeffs[0], dist_coeffs[1], dist_coeffs[2], dist_coeffs[3], dist_coeffs[4]
+            
+            x = normalized_points[:, 0]
+            y = normalized_points[:, 1]
+            
+            # 径向畸变计算
+            r2 = x*x + y*y
+            r4 = r2*r2
+            r6 = r4*r2
+            
+            # 径向畸变因子
+            radial_factor = 1 + k1*r2 + k2*r4 + k3*r6
+            
+            # 切向畸变计算
+            xy2 = 2*x*y
+            x2 = 2*x*x
+            y2 = 2*y*y
+            tangent_x = p1*xy2 + p2*(r2 + x2)
+            tangent_y = p1*(r2 + y2) + p2*xy2
+            
+            # 应用畸变（添加畸变效果，使点云匹配相机的畸变）
+            distorted_x = (x - tangent_x) / radial_factor
+            distorted_y = (y - tangent_y) / radial_factor
+            
+            distorted_points = np.column_stack([distorted_x, distorted_y])
+        else:
+            # 没有畸变或畸变系数为0
+            distorted_points = normalized_points
+            
+        # 转换为像素坐标 (使用内参矩阵)
+        # [u]   [fx  0  cx] [x']
+        # [v] = [ 0 fy  cy] [y']
+        # [1]   [ 0  0  1] [1 ]
+        fx = self.cam.intrinsic[0, 0]
+        fy = self.cam.intrinsic[1, 1]
+        cx = self.cam.intrinsic[0, 2]
+        cy = self.cam.intrinsic[1, 2]
+        
+        projected_points = np.zeros_like(distorted_points)
+        projected_points[:, 0] = distorted_points[:, 0] * fx + cx
+        projected_points[:, 1] = distorted_points[:, 1] * fy + cy
         
         # 检查投影点是否在图像范围内 (从图像获取实际尺寸)
-        img_width, img_height = self.cam.image.size
-        valid_x = (projected_points[:, 0] >= 0) & (projected_points[:, 0] < img_width)
-        valid_y = (projected_points[:, 1] >= 0) & (projected_points[:, 1] < img_height)
-        valid_indices_img = valid_x & valid_y
-        
-        print(f"在图像范围内的点数量: {np.sum(valid_indices_img)} / {len(projected_points)}")
-        if np.sum(valid_indices_img) > 0:
-            print("前5个在图像范围内的点坐标:")
-            print(projected_points[valid_indices_img][:5])
+        if self.cam.image is not None:
+            img_width, img_height = self.cam.image.size
+            valid_x = (projected_points[:, 0] >= 0) & (projected_points[:, 0] < img_width)
+            valid_y = (projected_points[:, 1] >= 0) & (projected_points[:, 1] < img_height)
+            valid_indices_img = valid_x & valid_y
+            
+            print(f"在图像范围内的点数量: {np.sum(valid_indices_img)} / {len(projected_points)}")
+            if np.sum(valid_indices_img) > 0:
+                print("前5个在图像范围内的点坐标:")
+                print(projected_points[valid_indices_img][:5])
+        else:
+            print("警告：未加载相机图像，无法检查点是否在图像范围内")
         
         return projected_points
+    
     def img_cloud_mapping(self, save_image=True):
         """
         将LiDAR投影的标定板角点与图像中检测到的角点进行对比
