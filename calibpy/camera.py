@@ -13,8 +13,16 @@ class Camera:
         config = get_config()
         self.intrinsic = np.array(config.camera_intrinsic).reshape(3, 3)
         self.extrinsic = np.array(config.camera_extrinsic).reshape(4, 4)
+        # 添加对相机畸变系数的支持
+        self.distortion_coefficients = np.array(config.camera_distortion_coefficients)
         self.image = Image.open(config.image)
         self.chessboard_size = (6, 7)  # 棋盘格内角点数 (宽, 高)
+        
+        # 添加调试信息
+        print(f"相机图像文件: {config.image}")
+        print(f"相机内参矩阵:\n{self.intrinsic}")
+        print(f"相机外参矩阵:\n{self.extrinsic}")
+        print(f"畸变系数: {self.distortion_coefficients}")
     
     def get_caliboard(self):
         # 使用6*7（内角点数）进行标定

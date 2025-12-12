@@ -18,6 +18,8 @@ class Config:
             self.camera_extrinsic = config_data["camera_extrinsic"]
             self.lidar_extrinsic = config_data["lidar_extrinsic"]
             self.camera_intrinsic = config_data["camera_intrinsic"]
+            # 添加相机畸变系数的支持，默认为零值
+            self.camera_distortion_coefficients = config_data.get("camera_distortion_coefficients", [0, 0, 0, 0, 0])
             self.target_path = config_data["target_path"]
             
             # 先初始化基本配置，然后再处理Target
@@ -46,9 +48,9 @@ class Target:
             target_path = config.target_path
             
         # 只使用一个固定的文件组合，而不是读取整个目录
-        self.image = os.path.join(target_path, f"{index}.jpg")
-        self.cloud = os.path.join(target_path, f"{index}.pcd")
-        self.label = os.path.join(target_path, f"{index}.json")
+        self.image = os.path.join(target_path, f"image.jpg")
+        self.cloud = os.path.join(target_path, f"cloud.pcd")
+        self.label = os.path.join(target_path, f"label.json")
         
         # 确保文件存在
         if not os.path.exists(self.image):

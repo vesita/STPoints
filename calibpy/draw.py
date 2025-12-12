@@ -5,6 +5,8 @@
 绘制脚本，用于验证相机-LiDAR外参计算的正确性
 """
 
+import os
+import time
 import cv2
 import numpy as np
 from PIL import Image
@@ -39,10 +41,10 @@ class CalibrationVisualizer:
     
     def project_points_to_image(self, points):
         """
-        将3D点云投影到图像上
+        使用OpenCV的projectPoints函数将3D点云投影到图像上
         
         Args:
-            points: 3D点云数据 (Nx3)
+            points: 3D点云数据 (Nx3)，在LiDAR坐标系中
         
         Returns:
             projected_points: 投影到图像上的点 (Nx2)
@@ -50,42 +52,24 @@ class CalibrationVisualizer:
         if len(points) == 0:
             return np.array([])
         
-        # 构造变换矩阵：世界坐标系 -> 相机坐标系
-        world_to_camera = self.cam.extrinsic
+        # 使用与calib.py中相同的投影方法
+        camera_matrix = self.cam.intrinsic
+        dist_coeffs = self.cam.distortion_coefficients.reshape(1, -1)
         
-        # 构造齐次坐标
-        points_world_homo = np.hstack([points, np.ones((points.shape[0], 1))])
+        # 从外参矩阵提取旋转向量和平移向量（与calib.py保持一致）
+        rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
+        tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)
         
-        # 变换到相机坐标系
-        points_camera_homo = (world_to_camera @ points_world_homo.T).T
+        # 使用cv2.projectPoints进行投影
+        projected_points, _ = cv2.projectPoints(
+            np.array(points, dtype=np.float32), 
+            rvec, tvec, 
+            camera_matrix.astype(np.float32), 
+            dist_coeffs.astype(np.float32)
+        )
         
-        # 检查是否在相机前方（Z坐标为正）
-        valid_indices = points_camera_homo[:, 2] > 0
-        points_camera = points_camera_homo[valid_indices, :3]
-        
-        print(f"在相机前方的点数量: {np.sum(valid_indices)} / {len(points)}")
-        
-        if len(points_camera) == 0:
-            return np.array([])
-        
-        # 应用相机内参进行投影
-        camera_points_homo = (self.cam.intrinsic @ points_camera.T).T
-        
-        # 透视除法得到图像坐标
-        projected_points = camera_points_homo[:, :2] / camera_points_homo[:, 2:3]
-        
-        # 检查投影点是否在图像范围内 (从图像获取实际尺寸)
-        img_width, img_height = self.cam.image.size
-        valid_x = (projected_points[:, 0] >= 0) & (projected_points[:, 0] < img_width)
-        valid_y = (projected_points[:, 1] >= 0) & (projected_points[:, 1] < img_height)
-        valid_indices_img = valid_x & valid_y
-        
-        print(f"在图像范围内的点数量: {np.sum(valid_indices_img)} / {len(projected_points)}")
-        if np.sum(valid_indices_img) > 0:
-            print("前5个在图像范围内的点坐标:")
-            print(projected_points[valid_indices_img][:5])
-        
-        return projected_points
+        return projected_points.reshape(-1, 2)
+    
     def img_cloud_mapping(self, save_image=True):
         """
         将LiDAR投影的标定板角点与图像中检测到的角点进行对比
@@ -103,12 +87,32 @@ class CalibrationVisualizer:
         # 将PIL图像转换为OpenCV格式
         image_cv = cv2.cvtColor(np.array(self.cam.image), cv2.COLOR_RGB2BGR)
         
-        # 获取LiDAR投影的标定板角点
+        # 获取LiDAR坐标系中的标定板角点
         lidar_board_corners = self.lid.target_corners()
-        lidar_projected_corners = self.project_points_to_image(lidar_board_corners)
+        print(f"LiDAR棋盘格角点数量: {len(lidar_board_corners)}")
+        
+        # 获取相机内外参
+        camera_matrix = self.cam.intrinsic
+        dist_coeffs = self.cam.distortion_coefficients.reshape(1, -1)  # 确保形状正确
+        cam_extrinsic = self.cam.extrinsic
+        
+        # 使用与calib.py完全一致的方式进行投影
+        rvec, _ = cv2.Rodrigues(cam_extrinsic[:3, :3])
+        tvec = cam_extrinsic[:3, 3].reshape(-1, 1)
+        print(f"旋转矩阵 (rvec):\n{rvec}")
+        print(f"平移向量 (tvec):\n{tvec}")
+        
+        lidar_projected_corners, _ = cv2.projectPoints(
+            lidar_board_corners.astype(np.float32), 
+            rvec, tvec, 
+            camera_matrix.astype(np.float32), 
+            dist_coeffs.astype(np.float32)
+        )
+        lidar_projected_corners = lidar_projected_corners.reshape(-1, 2)
         
         # 获取图像中检测到的棋盘格角点
         image_corners = self.cam.get_caliboard()
+        print(f"图像检测角点数量: {len(image_corners)}")
         
         print(f"LiDAR投影角点数量: {len(lidar_projected_corners)}")
         print(f"图像检测角点数量: {len(image_corners)}")
@@ -130,41 +134,29 @@ class CalibrationVisualizer:
                 cv2.putText(image_cv, f'I{i}', (int(x)+5, int(y)+15), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
         
-        camera_matrix = self.cam.intrinsic
-        dist_coeffs = np.zeros((4, 1), dtype=np.float32)
         
-        rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
-        tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)
-        print("从外参矩阵提取的rvec:")
-        print(rvec)
-        print("从外参矩阵提取的tvec:")
-        print(tvec)
-        
-        # 直接使用LiDAR坐标进行重投影
-        projected_points, _ = cv2.projectPoints(
-            lidar_board_corners, rvec, tvec, camera_matrix, dist_coeffs)
-        
-        # 计算重投影误差 (均方根误差)，此计算方式必须与calib.py中的评估标准一致
-        projected_points = projected_points.reshape(-1, 2)
-        print("前10个重投影点:")
-        print(projected_points[:10])
-        print("前10个图像检测点:")
-        print(image_corners[:10])
         # 使用欧氏距离的均方根作为重投影误差
-        reprojection_error = np.sqrt(np.mean((image_corners - projected_points) ** 2))
+        reprojection_error = np.sqrt(np.mean((image_corners - lidar_projected_corners) ** 2))
         
         print(f"重投影误差统计:")
         print(f"  平均误差: {reprojection_error:.2f} 像素")
+        print(f"  使用点数: {image_corners.shape[0]}")
         
         # 在图像上显示误差信息
         cv2.putText(image_cv, f'重投影误差: {reprojection_error:.2f} 像素', 
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         
-        # 保存带标注的图像
         if save_image:
-            cv2.imwrite('calibration_result.png', image_cv)
-            print("已保存标注图像到 calibration_result.png")
-        
+            # 确保目录存在
+            os.makedirs('temp/image', exist_ok=True)
+            
+            # 生成时间戳文件名
+            timestamp = int(time.time())
+            save_path = f'temp/image/calibration_result_{timestamp}.png'
+            
+            cv2.imwrite(save_path, image_cv)
+            print(f"已保存标注图像到 {save_path}")
+
         return {
             'image': image_cv,
             'reprojection_error': reprojection_error,

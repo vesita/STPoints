@@ -4,313 +4,304 @@ import numpy as np
 
 try:
     from calibpy.fast_config import get_config
+    from calibpy.utils.rotation import rotation_matrix
 except:
     from fast_config import get_config
+    from utils.rotation import rotation_matrix
 
 
 class BoundingBox:
     def __init__(self):
-        self.width = 0
-        self.height = 0
-        self.depth = 0
-        self.pos = np.eye(4, 4)  # 修复：正确初始化4x4单位矩阵
+        self.position = {"x": 0, "y": 0, "z": 0}
+        self.rotation = {"x": 0, "y": 0, "z": 0}
+        self.scale = {"x": 0, "y": 0, "z": 0}
 
     def from_file(self, file_path):
         with open(file_path, 'r') as f:
             file = json.load(f)
-        self.width = file["width"]
-        self.height = file["height"]
-        self.depth = file["depth"]
-        self.pos = file["pos"]
+        psr = file[0]["psr"]
+        self.position = psr["position"]
+        self.rotation = psr["rotation"]
+        self.scale = psr["scale"]
 
     def inside(self, point):
-        # 将点转换为包围盒局部坐标系
-        # 创建齐次坐标
-        point_homo = np.array([point[0], point[1], point[2], 1.0])
+        """
+        检查点是否在由位置、旋转和尺度定义的盒子内
+        点云和标签使用相同坐标系，但仍需要正确的坐标变换
+        """
+        # # 将点转换到盒子坐标系
+        # dx = point[0] - self.position["x"]
+        # dy = point[1] - self.position["y"]
+        # dz = point[2] - self.position["z"]
         
-        # 获取包围盒的逆变换矩阵，将点转换到包围盒局部坐标系
-        inv_transform = np.linalg.inv(self.pos)
-        local_point = inv_transform @ point_homo
+        # # 根据欧拉角创建旋转矩阵 (ZYX约定)
+        # cos_z, sin_z = np.cos(self.rotation["z"]), np.sin(self.rotation["z"])
+        # cos_y, sin_y = np.cos(self.rotation["y"]), np.sin(self.rotation["y"])
+        # cos_x, sin_x = np.cos(self.rotation["x"]), np.sin(self.rotation["x"])
         
-        # 在局部坐标系中检查点是否在包围盒内
-        half_width = self.width / 2
-        half_height = self.height / 2
-        half_depth = self.depth / 2
+        # # 旋转矩阵
+        # rot_z = np.array([[cos_z, -sin_z, 0], [sin_z, cos_z, 0], [0, 0, 1]])
+        # rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
+        # rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
+        
+        # # 组合旋转矩阵 (R = Rz * Ry * Rx)
+        # rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+        
+        # # 对点应用逆变换(旋转矩阵的转置)，将列表转换为numpy数组后再进行转置操作
+        # local_point = np.dot(rotation_matrix.T, np.array([dx, dy, dz]).T)
+        
+        # # 检查点是否在盒子内
+        # return (
+        #     abs(local_point[0]) <= self.scale["x"] / 2 and
+        #     abs(local_point[1]) <= self.scale["y"] / 2 and
+        #     abs(local_point[2]) <= self.scale["z"] / 2
+        # )
+        
+        rotation = rotation_matrix(self.rotation["x"], self.rotation["y"], self.rotation["z"])
+        matrix = np.array([
+            [rotation[0,0], rotation[0,1], rotation[0,2], self.position["x"]],
+            [rotation[1,0], rotation[1,1], rotation[1,2], self.position["y"]],
+            [rotation[2,0], rotation[2,1], rotation[2,2], self.position["z"]],
+            [0, 0, 0, 1]
+        ])
+        
+        point = np.linalg.inv(matrix) @ np.array([point[0], point[1], point[2], 1]).T
         
         return (
-            abs(local_point[0]) <= half_width and
-            abs(local_point[1]) <= half_height and
-            abs(local_point[2]) <= half_depth
+            abs(point[0]) <= self.scale["x"] / 2 and
+            abs(point[1]) <= self.scale["y"] / 2 and
+            abs(point[2]) <= self.scale["z"] / 2
         )
-
 
 class Lidar:
     def __init__(self):
         config = get_config()
         self.extrinsic = np.array(config.get_lidar_extrinsic()).reshape(4, 4)
-        self.cloud = o3d.io.read_point_cloud(config.cloud)
+        self.cloud = o3d.io.read_point_cloud(config.cloud).points
         bx = BoundingBox()
         bx.from_file(config.label)
         self.bounding_box = bx
         
+        # 添加调试信息
+        print(f"LiDAR点云文件: {config.cloud}")
+        print(f"LiDAR标签文件: {config.label}")
+        print(f"LiDAR点云点数: {len(self.cloud)}")
+        
     def target_cloud_self(self):
-        return [point for point in self.cloud.points if self.bounding_box.inside(point)]
+        return [point for point in self.cloud if self.bounding_box.inside(point)]
     
     def target_cloud(self):
+        """
+        获取LiDAR坐标系中的目标点云
+        注意：这里返回的是LiDAR坐标系中的点，不是世界坐标系中的点
+        """
         points = self.target_cloud_self()
-        # 如果没有点在包围盒内，返回空列表而不是 None
-        if len(points) == 0:
-            return []
-            
-        trans2world = np.linalg.inv(self.extrinsic)
-        # 将点转换为齐次坐标进行变换
-        transformed_points = []
-        for point in points:
-            homogenous_point = np.append(np.array(point), 1)
-            transformed_point = trans2world @ homogenous_point
-            transformed_points.append(transformed_point[:3])  # 只取x,y,z坐标
-        return transformed_points
+        return self.to_world(points)
     
     def target_corners(self):
-        cloud = self.target_cloud()
+        """
+        获取LiDAR坐标系中的棋盘格角点，不进行额外的坐标变换
+        注意：此方法直接返回LiDAR坐标系中的点，坐标变换将在后续处理中进行
+        """
+        cloud = self.target_cloud_self()
         print(f"LiDAR目标点云数量: {len(cloud)}")
         
-        box = self.cloud2box(cloud)
-        print(f"包围盒信息: {box}")
+        box = min_box(cloud)
+        # 使用cloud.py中的逻辑计算包围盒角点
+        corners = box_corners(box["position"], box["rotation"], box["scale"])
+        print(f"包围盒8个角点: {corners}")
         
-        corner8 = self.box_corners(box)
-        print(f"包围盒8个角点: {corner8}")
-        
-        corner_board = self.corner_caliboard(corner8)
+        corner_board = corner_caliboard(box["position"], box["rotation"], box["scale"])
         print(f"棋盘格角点数量: {len(corner_board)}")
         
         return corner_board
+        return self.to_world(corner_board)
     
-    def cloud2box(self, cloud):
-        """
-        根据输入的点云，计算最小包围盒
-        :param cloud: 点云数据列表
-        :return: 包围盒参数 (中心点, 尺寸)
-        """
-        if len(cloud) == 0:
-            return None
-            
-        # 转换为numpy数组
-        points = np.array(cloud, dtype=np.float32)
-        
-        # 计算各维度的最小值和最大值
-        min_coords = np.min(points, axis=0)
-        max_coords = np.max(points, axis=0)
-        
-        # 计算中心点和尺寸
-        center = (min_coords + max_coords) / 2
-        size = max_coords - min_coords
-        
-        return {
-            'center': center.astype(np.float32),
-            'size': size.astype(np.float32)
-        }
+    def to_world(self, points):
+        # rot = self.extrinsic[:3, :3]
+        # result = []
+        # for point in points:
+        #     rotated_point = np.dot(rot.T, point)
+        #     # point = [-point[1], -point[2], point[0]]
+        #     # result.append(point)
+        #     result.append(rotated_point)
+        # result = [[point[0], -point[1], -point[2]] for point in points]
+        # return np.array(result)
+
+        return [(self.extrinsic @ np.append(point, 1))[:3] for point in points]
+
     
-    def box_corners(self, box):
-        """
-        根据最小包围盒计算包围盒的8个顶点
-        :param box: 包围盒参数
-        :return: 8个顶点坐标
-        """
-        if box is None:
-            return np.array([])
-            
-        center = box['center']
-        size = box['size']
-        
-        # 计算半尺寸
-        half_size = size / 2
-        
-        # 计算8个顶点
-        corners = []
-        for i in range(2):
-            for j in range(2):
-                for k in range(2):
-                    dx = half_size[0] if i == 1 else -half_size[0]
-                    dy = half_size[1] if j == 1 else -half_size[1]
-                    dz = half_size[2] if k == 1 else -half_size[2]
-                    corner = [
-                        center[0] + dx,
-                        center[1] + dy,
-                        center[2] + dz
-                    ]
-                    corners.append(corner)
-        
-        return np.array(corners, dtype=np.float32)
+def corner_caliboard(position, rotation, scale):
     
-    def corner_caliboard(self, corners):
-        """
-        根据包围盒的8个顶点，计算出6*7的内角点数量
-        :param corners: 包围盒的8个顶点
-        :return: 棋盘格角点坐标 (6*7=42个点)
-        """
-        if len(corners) == 0:
-            return []
+    # 根据欧拉角创建旋转矩阵 (ZYX约定)
+    cos_z, sin_z = np.cos(rotation["z"]), np.sin(rotation["z"])
+    cos_y, sin_y = np.cos(rotation["y"]), np.sin(rotation["y"])
+    cos_x, sin_x = np.cos(rotation["x"]), np.sin(rotation["x"])
+
+    # 旋转矩阵
+    rot_z = np.array([[cos_z, -sin_z, 0], [sin_z, cos_z, 0], [0, 0, 1]])
+    rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
+    rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
+
+    # 组合旋转矩阵 (R = Rz * Ry * Rx)
+    rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+    
+    # 根据实际的x、y、z轴尺寸确定棋盘格方向，而不是简单的排序
+    # 找到最长和次长的轴
+    scale_items = [("x", scale["x"]), ("y", scale["y"]), ("z", scale["z"])]
+    scale_items.sort(key=lambda x: x[1], reverse=True)
+    
+    # 最长轴作为length方向，次长轴作为width方向
+    length_axis = scale_items[0][0]  # 最长轴名称 ("x", "y", 或 "z")
+    width_axis = scale_items[1][0]   # 次长轴名称
+    
+    # 获取对应的尺寸值
+    length = scale[length_axis]
+    width = scale[width_axis]
+    
+    # 使用固定步长而不是按比例分配，确保棋盘格点均匀分布
+    # 这样可以提高OpenCV solvePnP算法的准确性
+    # fixed_step = min(width, length) / 10  # 使用较小尺寸的1/10作为固定步长
+    fixed_step = 0.1
+    
+    # 计算棋盘格的边界范围
+    width_range = fixed_step * 6  # 6个间隔
+    length_range = fixed_step * 7  # 7个间隔
+    
+    # 计算基准点（左上角）
+    width_base = -width_range / 2
+    length_base = -length_range / 2
+    
+    points = []
+    
+    # 生成棋盘格点 (6行 x 7列)，使用均匀分布的固定步长
+    for i in range(1, 7):
+        for j in range(1, 8):
+            # 创建局部坐标的初始点 (在xy平面)
+            local_point = [0, 0, 0]
+            local_point[["x", "y", "z"].index(width_axis)] = width_base + i * fixed_step
+            local_point[["x", "y", "z"].index(length_axis)] = length_base + j * fixed_step
             
-        # 检查corners是否有效
-        if np.isnan(corners).any() or np.isinf(corners).any():
-            print("警告：包围盒角点包含无效值")
-            return []
-        
-        # 棋盘格是6列7行的内角点，总共42个点
-        rows, cols = 7, 6  # 7行6列
-        
-        # 找到包围盒的不同表面
-        # 按照x, y, z坐标分别聚类
-        x_coords = corners[:, 0]
-        y_coords = corners[:, 1]
-        z_coords = corners[:, 2]
-        
-        # 找到x, y, z的极值
-        x_min, x_max = np.min(x_coords), np.max(x_coords)
-        y_min, y_max = np.min(y_coords), np.max(y_coords)
-        z_min, z_max = np.min(z_coords), np.max(z_coords)
-        
-        print(f"包围盒X范围: [{x_min:.3f}, {x_max:.3f}]")
-        print(f"包围盒Y范围: [{y_min:.3f}, {y_max:.3f}]")
-        print(f"包围盒Z范围: [{z_min:.3f}, {z_max:.3f}]")
-        
-        # 确定哪个表面朝向相机（Z坐标最大的表面）
-        # 但在LiDAR坐标系中，我们不知道哪个表面朝向相机
-        # 需要根据包围盒的几何特征选择合适的表面
-        
-        # 选择面积最大的表面作为棋盘格所在表面
-        # 计算三个表面的面积
-        area_x = (y_max - y_min) * (z_max - z_min)  # YZ平面
-        area_y = (x_max - x_min) * (z_max - z_min)  # XZ平面
-        area_z = (x_max - x_min) * (y_max - y_min)  # XY平面
-        
-        print(f"表面面积 - X方向: {area_x:.3f}, Y方向: {area_y:.3f}, Z方向: {area_z:.3f}")
-        
-        # 选择面积最大的表面
-        max_area = max(area_x, area_y, area_z)
-        if max_area == area_x:
-            # YZ平面，固定X坐标
-            fixed_val = x_max if np.sum(corners[:, 0] > (x_min + x_max) / 2) > 2 else x_min
-            surface_points = corners[np.abs(corners[:, 0] - fixed_val) < 1e-3]
-            plane_type = "YZ"
-            fixed_coord = fixed_val
-        elif max_area == area_y:
-            # XZ平面，固定Y坐标
-            fixed_val = y_max if np.sum(corners[:, 1] > (y_min + y_max) / 2) > 2 else y_min
-            surface_points = corners[np.abs(corners[:, 1] - fixed_val) < 1e-3]
-            plane_type = "XZ"
-            fixed_coord = fixed_val
-        else:
-            # XY平面，固定Z坐标
-            fixed_val = z_max if np.sum(corners[:, 2] > (z_min + z_max) / 2) > 2 else z_min
-            surface_points = corners[np.abs(corners[:, 2] - fixed_val) < 1e-3]
-            plane_type = "XY"
-            fixed_coord = fixed_val
+            points.append(local_point)
             
-        print(f"选择的表面: {plane_type} 平面, 固定坐标值: {fixed_coord:.3f}")
-        print(f"表面点数量: {len(surface_points)}")
-        print(f"表面点坐标:")
-        for i, point in enumerate(surface_points):
-            print(f"  点{i}: ({point[0]:.3f}, {point[1]:.3f}, {point[2]:.3f})")
+    result = []
+    
+    # 应用旋转和平移到每个点
+    for point in points:
+        rotated_point = np.dot(rotation_matrix, point)
+        rotated_point[0] += position["x"]
+        rotated_point[1] += position["y"]
+        rotated_point[2] += position["z"]
+        result.append(rotated_point)
+    
+    # 返回numpy数组而不是普通列表
+    return np.array(result)
+
+def box_corners(position, rotation, scale):
+    original = [[-scale["x"] / 2, -scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, -scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, -scale["y"] / 2, scale["z"] / 2],
+                [-scale["x"] / 2, -scale["y"] / 2, scale["z"] / 2],
+                [-scale["x"] / 2, scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, scale["y"] / 2, scale["z"] / 2],
+                [-scale["x"] / 2, scale["y"] / 2, scale["z"] / 2]]
+    
+    # 根据欧拉角创建旋转矩阵 (ZYX约定)
+    cos_z, sin_z = np.cos(rotation["z"]), np.sin(rotation["z"])
+    cos_y, sin_y = np.cos(rotation["y"]), np.sin(rotation["y"])
+    cos_x, sin_x = np.cos(rotation["x"]), np.sin(rotation["x"])
+    
+    # 旋转矩阵
+    rot_z = np.array([[cos_z, -sin_z, 0], [sin_z, cos_z, 0], [0, 0, 1]])
+    rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
+    rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
+    
+    # 组合旋转矩阵 (R = Rz * Ry * Rx)
+    rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+    
+    points = []
+    for point in original:
+        rotated_point = np.dot(rotation_matrix, point)
+        rotated_point[0] += position["x"]
+        rotated_point[1] += position["y"]
+        rotated_point[2] += position["z"]
+        points.append(rotated_point)
+    return np.array(points)
+
+
+def min_box(cloud):
+    """
+    计算点云的最小包围盒（Oriented Bounding Box）
+    :param cloud: 点云数据列表
+    :return: 包围盒参数 (中心点, 尺寸, 旋转)
+    """
+    if len(cloud) == 0:
+        return None
         
-        if len(surface_points) < 4:
-            print(f"错误：表面点数不足，只有{len(surface_points)}个点")
-            return []
+    # 转换为numpy数组
+    points = np.array(cloud, dtype=np.float32)
+    
+    # 计算协方差矩阵
+    cov_matrix = np.cov(points, rowvar=False)
+    
+    # 计算特征向量和特征值
+    eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+    
+    # 按特征值大小排序特征向量
+    idx = np.argsort(eigenvalues)[::-1]
+    eigenvectors = eigenvectors[:, idx]
+    
+    # 确保构成右手坐标系
+    if np.linalg.det(eigenvectors) < 0:
+        eigenvectors[:, -1] *= -1
+    
+    # 将点云变换到主成分坐标系
+    transformed_points = points @ eigenvectors
+    
+    # 在主成分坐标系中计算AABB
+    min_coords = np.min(transformed_points, axis=0)
+    max_coords = np.max(transformed_points, axis=0)
+    
+    scale = {
+        'x': max_coords[0] - min_coords[0],
+        'y': max_coords[1] - min_coords[1],
+        'z': max_coords[2] - min_coords[2]
+    }
+    
+    center_local = (min_coords + max_coords) / 2
+    
+    # 将中心点变换回世界坐标系
+    center_world = eigenvectors @ center_local
+    
+    # 从特征向量计算欧拉角
+    rotation = rotation_matrix_to_euler_angles(eigenvectors)
+    
+    return {
+        'position': {"x": center_world[0], "y": center_world[1], "z": center_world[2]},
+        'scale': scale,
+        'rotation': rotation
+    }
+
+
+def rotation_matrix_to_euler_angles(R):
+    """
+    将旋转矩阵转换为欧拉角 (ZYX约定)
+    :param R: 3x3 旋转矩阵
+    :return: 欧拉角字典
+    """
+    sy = np.sqrt(R[0, 0] * R[0, 0] + R[1, 0] * R[1, 0])
+    
+    singular = sy < 1e-6
+    
+    if not singular:
+        x = np.arctan2(R[2, 1], R[2, 2])
+        y = np.arctan2(-R[2, 0], sy)
+        z = np.arctan2(R[1, 0], R[0, 0])
+    else:
+        x = np.arctan2(-R[1, 2], R[1, 1])
+        y = np.arctan2(-R[2, 0], sy)
+        z = 0
         
-        # 在选定的表面上找到四个角点
-        # 按照到质心的距离排序，找到最外围的四个点
-        centroid = np.mean(surface_points, axis=0)
-        distances = np.linalg.norm(surface_points - centroid, axis=1)
-        
-        # 找到距离质心最远的点作为参考
-        farthest_idx = np.argmax(distances)
-        farthest_point = surface_points[farthest_idx]
-        
-        # 找到与最远点距离最远的点
-        distances_to_farthest = np.linalg.norm(surface_points - farthest_point, axis=1)
-        opposite_idx = np.argmax(distances_to_farthest)
-        opposite_point = surface_points[opposite_idx]
-        
-        # 在剩下的点中找到另外两个角点
-        remaining_indices = [i for i in range(len(surface_points)) if i not in [farthest_idx, opposite_idx]]
-        if len(remaining_indices) >= 2:
-            # 计算剩余点到已选两点连线的距离
-            remaining_points = surface_points[remaining_indices]
-            
-            # 计算点到线段的距离
-            def point_to_line_distance(p, a, b):
-                # 点p到线段ab的距离
-                ap = p - a
-                ab = b - a
-                ab_sq = np.dot(ab, ab)
-                if ab_sq == 0:
-                    return np.linalg.norm(ap)
-                t = max(0, min(1, np.dot(ap, ab) / ab_sq))
-                projection = a + t * ab
-                return np.linalg.norm(p - projection)
-            
-            distances1 = [point_to_line_distance(p, farthest_point, opposite_point) for p in remaining_points]
-            max_dist_idx1 = np.argmax(distances1)
-            third_point = remaining_points[max_dist_idx1]
-            
-            # 移除第三个点，找第四个点
-            remaining_indices2 = [i for i in remaining_indices if i != remaining_indices[max_dist_idx1]]
-            if len(remaining_indices2) >= 1:
-                remaining_points2 = surface_points[remaining_indices2]
-                distances2 = [point_to_line_distance(p, farthest_point, opposite_point) for p in remaining_points2]
-                max_dist_idx2 = np.argmax(distances2)
-                fourth_point = remaining_points2[max_dist_idx2]
-            else:
-                # 如果找不到第四个点，使用质心附近的一个点
-                closest_to_centroid_idx = np.argmin(distances)
-                fourth_point = surface_points[closest_to_centroid_idx]
-        else:
-            # 如果点不够，使用简单方法
-            sorted_indices = np.argsort(distances_to_farthest)
-            third_point = surface_points[sorted_indices[-2]] if len(sorted_indices) >= 2 else surface_points[0]
-            fourth_point = surface_points[sorted_indices[-3]] if len(sorted_indices) >= 3 else surface_points[1]
-        
-        # 确定四个角点的相对位置
-        # 按照某种规则排序四个点
-        four_corners = [farthest_point, opposite_point, third_point, fourth_point]
-        
-        # 按照x+y的和排序，找到左上角和右下角
-        sum_coords = [p[0] + p[1] for p in four_corners]
-        diff_coords = [p[0] - p[1] for p in four_corners]
-        
-        top_left_idx = np.argmin(sum_coords)
-        bottom_right_idx = np.argmax(sum_coords)
-        bottom_left_idx = np.argmin(diff_coords)
-        top_right_idx = np.argmax(diff_coords)
-        
-        top_left = four_corners[top_left_idx]
-        top_right = four_corners[top_right_idx]
-        bottom_left = four_corners[bottom_left_idx]
-        bottom_right = four_corners[bottom_right_idx]
-        
-        print(f"确定的四个角点:")
-        print(f"  左上角: ({top_left[0]:.3f}, {top_left[1]:.3f}, {top_left[2]:.3f})")
-        print(f"  右上角: ({top_right[0]:.3f}, {top_right[1]:.3f}, {top_right[2]:.3f})")
-        print(f"  左下角: ({bottom_left[0]:.3f}, {bottom_left[1]:.3f}, {bottom_left[2]:.3f})")
-        print(f"  右下角: ({bottom_right[0]:.3f}, {bottom_right[1]:.3f}, {bottom_right[2]:.3f})")
-        
-        # 生成棋盘格点 (6列7行)
-        board_points = []
-        for i in range(rows):  # 7行
-            for j in range(cols):  # 6列
-                # 双线性插值计算点坐标
-                u = j / (cols - 1) if cols > 1 else 0  # 列比例
-                v = i / (rows - 1) if rows > 1 else 0  # 行比例
-                
-                # 双线性插值
-                point = (1 - u) * (1 - v) * top_left + \
-                        u * (1 - v) * top_right + \
-                        (1 - u) * v * bottom_left + \
-                        u * v * bottom_right
-                        
-                board_points.append(point)
-        
-        result = np.array(board_points, dtype=np.float32)
-        print(f"生成棋盘格点数量: {len(result)}")
-        return result
+    return {"x": x, "y": y, "z": z}
+

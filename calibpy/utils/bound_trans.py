@@ -143,8 +143,8 @@ def write_bounding_box(input_json_path, output_json_path):
 # 示例用法
 if __name__ == "__main__":
     # 示例：处理dif.json文件并将结果写入0.json
-    input_file = "data/extr/dif.json"
-    output_file = "data/extr/0.json"
+    input_file = "data/va/dif.json"
+    output_file = "data/va/0.json"
     
     # 确保输出目录存在
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
