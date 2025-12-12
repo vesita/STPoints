@@ -326,4 +326,6 @@ if __name__ == "__main__":
     write_calib_files(s, os.path.join(args.output, args.scene))
 
     write_image02_files(s, os.path.join(args.output, args.scene, args.scene, "image_02"))
-    
+
+# cd tools
+# python suscape_labels_to_kitti_raw.py --rootdir ../data --scene scene-000002 --output ../out/test
