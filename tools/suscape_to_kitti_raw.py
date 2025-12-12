@@ -5,6 +5,7 @@ import utils
 
 import numpy as np
 from scipy.interpolate import interp1d
+from pypcd import pypcd
 
 def psr_to_np(psr):
     return np.array([
@@ -301,6 +302,45 @@ def write_image02_files(scene, output_folder):
             # write timestamp line
             tf.write("{}\n".format(f))
 
+
+
+def write_velodyne_files(scene, output_folder):
+    
+    """
+    read lidar files, write xyzi text files to output_folder
+    """
+
+    frames = scene.meta['frames']
+    os.makedirs(os.path.join(output_folder, "data"), exist_ok=True)
+    
+    timestamp_file = os.path.join(output_folder, "timestamps.txt")
+    with open(timestamp_file, 'w') as tf:
+
+        for i, f in enumerate(frames):
+            src_lidar_file = os.path.join(scene.scene_path, "lidar", f + ".pcd")
+            tgt_lidar_file = os.path.join(output_folder, "data", "{:010d}.txt".format(i))
+
+            # read pcd
+            pc = pypcd.PointCloud.from_path(src_lidar_file)
+            points = pc.pc_data  # numpy structured array
+
+            # extract x,y,z,intensity
+            x = points['x']
+            y = points['y']
+            z = points['z']
+            try:
+                intensity = points['intensity']
+            except Exception:
+                intensity = np.zeros_like(x)
+
+            xyzi = np.stack([x, y, z, intensity], axis=-1).astype(np.float32)
+
+            # write to text file
+            np.savetxt(tgt_lidar_file, xyzi, fmt="%.6f")
+
+            # write timestamp line
+            tf.write("{}\n".format(f))
+
 if __name__ == "__main__":
     import argparse
     import os
@@ -326,6 +366,9 @@ if __name__ == "__main__":
     write_calib_files(s, os.path.join(args.output, args.scene))
 
     write_image02_files(s, os.path.join(args.output, args.scene, args.scene, "image_02"))
+
+
+    write_velodyne_files(s, os.path.join(args.output, args.scene, args.scene, "velodyne_points"))
 
 # cd tools
 # python suscape_labels_to_kitti_raw.py --rootdir ../data --scene scene-000002 --output ../out/test
