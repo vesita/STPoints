@@ -42,7 +42,7 @@ class CalibrationVisualizer:
         使用OpenCV的projectPoints函数将3D点云投影到图像上
         
         Args:
-            points: 3D点云数据 (Nx3)
+            points: 3D点云数据 (Nx3)，在LiDAR坐标系中
         
         Returns:
             projected_points: 投影到图像上的点 (Nx2)
@@ -52,9 +52,9 @@ class CalibrationVisualizer:
         
         # 使用与calib.py中相同的投影方法
         camera_matrix = self.cam.intrinsic
-        dist_coeffs = self.cam.distortion_coefficients
+        dist_coeffs = self.cam.distortion_coefficients.reshape(1, -1)
         
-        # 从外参矩阵提取旋转向量和平移向量
+        # 从外参矩阵提取旋转向量和平移向量（与calib.py保持一致）
         rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
         tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)
         
@@ -62,8 +62,8 @@ class CalibrationVisualizer:
         projected_points, _ = cv2.projectPoints(
             np.array(points, dtype=np.float32), 
             rvec, tvec, 
-            camera_matrix, 
-            dist_coeffs
+            camera_matrix.astype(np.float32), 
+            dist_coeffs.astype(np.float32)
         )
         
         return projected_points.reshape(-1, 2)
@@ -85,23 +85,29 @@ class CalibrationVisualizer:
         # 将PIL图像转换为OpenCV格式
         image_cv = cv2.cvtColor(np.array(self.cam.image), cv2.COLOR_RGB2BGR)
         
-        # 获取LiDAR投影的标定板角点
+        # 获取LiDAR坐标系中的标定板角点
         lidar_board_corners = self.lid.target_corners()
         print(f"LiDAR棋盘格角点数量: {len(lidar_board_corners)}")
         print("前10个LiDAR棋盘格角点:")
         print(lidar_board_corners[:10] if len(lidar_board_corners) > 0 else "无数据")
         
-        # 使用cv2.projectPoints进行投影
-        rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
-        tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)
+        # 获取相机内外参
+        camera_matrix = self.cam.intrinsic
+        dist_coeffs = self.cam.distortion_coefficients.reshape(1, -1)  # 确保形状正确
+        cam_extrinsic = self.cam.extrinsic
+        
+        # 使用与calib.py完全一致的方式进行投影
+        rvec, _ = cv2.Rodrigues(cam_extrinsic[:3, :3])
+        tvec = cam_extrinsic[:3, 3].reshape(-1, 1)
         print(f"旋转矩阵 (rvec):\n{rvec}")
         print(f"平移向量 (tvec):\n{tvec}")
         
+        # 直接使用LiDAR坐标系中的点进行投影（与calib.py保持一致）
         lidar_projected_corners, _ = cv2.projectPoints(
-            np.array(lidar_board_corners, dtype=np.float32), 
+            lidar_board_corners.astype(np.float32), 
             rvec, tvec, 
-            self.cam.intrinsic, 
-            self.cam.distortion_coefficients
+            camera_matrix.astype(np.float32), 
+            dist_coeffs.astype(np.float32)
         )
         lidar_projected_corners = lidar_projected_corners.reshape(-1, 2)
         
@@ -131,19 +137,12 @@ class CalibrationVisualizer:
                 cv2.putText(image_cv, f'I{i}', (int(x)+5, int(y)+15), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
         
-        camera_matrix = self.cam.intrinsic
-        dist_coeffs = self.cam.distortion_coefficients
-        
-        rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
-        tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)
-        print("从外参矩阵提取的rvec:")
-        print(rvec)
-        print("从外参矩阵提取的tvec:")
-        print(tvec)
-        
-        # 直接使用LiDAR坐标进行重投影
+        # 使用LiDAR坐标系中的点进行重投影以计算误差（与calib.py保持一致）
         projected_points, _ = cv2.projectPoints(
-            lidar_board_corners, rvec, tvec, camera_matrix, dist_coeffs)
+            lidar_board_corners.astype(np.float32), 
+            rvec, tvec, 
+            camera_matrix.astype(np.float32), 
+            dist_coeffs.astype(np.float32))
         
         # 计算重投影误差 (均方根误差)，此计算方式必须与calib.py中的评估标准一致
         projected_points = projected_points.reshape(-1, 2)

@@ -141,6 +141,7 @@ def main():
     lid = lidar.Lidar()
     
     print("获取LiDAR生成的棋盘格3D点...")
+    # 注意：这里获取的是LiDAR坐标系中的点，已经经过坐标变换
     caliboard3D = lid.target_corners()
     print("获取图像中的棋盘格2D点...")
     caliboard2D = cam.get_caliboard()
@@ -187,11 +188,18 @@ def main():
             print(f"处理后 object_points shape: {object_points.shape}")
             print(f"处理后 image_points shape: {image_points.shape}")
             
+            # 验证坐标范围
+            print("\n坐标范围验证:")
+            print(f"3D点坐标范围 - X:{np.min(object_points[:,0]):.3f}~{np.max(object_points[:,0]):.3f}, "
+                  f"Y:{np.min(object_points[:,1]):.3f}~{np.max(object_points[:,1]):.3f}, "
+                  f"Z:{np.min(object_points[:,2]):.3f}~{np.max(object_points[:,2]):.3f}")
+            print(f"2D点坐标范围 - U:{np.min(image_points[:,0]):.3f}~{np.max(image_points[:,0]):.3f}, "
+                  f"V:{np.min(image_points[:,1]):.3f}~{np.max(image_points[:,1]):.3f}")
+            
             # 确保有足够的点进行solvePnP (至少4个点)
             if len(object_points) < 4 or len(image_points) < 4:
                 print(f"点数不足，需要至少4个点，当前3D点数: {len(object_points)}, 2D点数: {len(image_points)}")
                 return
-            # object_points = lid.to_world(object_points)
                 
             # 确保内参矩阵已定义
             camera_matrix = np.array(cam.intrinsic, dtype=np.float32)
@@ -222,6 +230,12 @@ def main():
             for method_flag, method_name in methods:
                 try:
                     print(f"尝试方法: {method_name}")
+                    # 验证输入参数
+                    assert object_points.shape[1] == 3, f"object_points 应为 Nx3 形状，实际为 {object_points.shape}"
+                    assert image_points.shape[1] == 2, f"image_points 应为 Nx2 形状，实际为 {image_points.shape}"
+                    assert camera_matrix.shape == (3, 3), f"camera_matrix 应为 3x3 形状，实际为 {camera_matrix.shape}"
+                    assert dist_coeffs.ndim == 2 and dist_coeffs.shape[0] == 1, f"dist_coeffs 应为 1xN 形状，实际为 {dist_coeffs.shape}"
+
                     success, rvec, tvec = cv2.solvePnP(
                         object_points, 
                         image_points, 
@@ -250,18 +264,37 @@ def main():
             
             if best_result:
                 success, rvec, tvec, method_name = best_result
-                print(f"选择最佳方法: {method_name}，误差: {best_error:.2f} 像素")
+                print(f"选择最佳方法: {method_name}，重投影误差: {best_error:.4f} 像素")
                 
-                # 将旋转向量转换为旋转矩阵
+                # 检查旋转矩阵的正交性
                 rotation_matrix, _ = cv2.Rodrigues(rvec)
+                print("\n旋转矩阵正交性检查:", end=" ")
+                identity_check = np.allclose(rotation_matrix @ rotation_matrix.T, np.eye(3))
+                determinant_check = np.allclose(np.linalg.det(rotation_matrix), 1.0)
+                if identity_check and determinant_check:
+                    print("通过")
+                else:
+                    print("未通过")
+                    print(f"  R*R^T = I: {identity_check}")
+                    print(f"  det(R) = 1: {determinant_check}")
                 
-                # 构造4x4的变换矩阵
+                # 构造4x4的变换矩阵（从LiDAR坐标系到相机坐标系）
                 extrinsic_matrix = np.eye(4, dtype=np.float32)
                 extrinsic_matrix[:3, :3] = rotation_matrix
                 extrinsic_matrix[:3, 3] = tvec.flatten()
                 
-                print("外参矩阵 (世界到相机):")
+                print("\n外参矩阵详细信息 (LiDAR到相机):")
+                print("旋转矩阵 R:")
+                print(rotation_matrix)
+                print("平移向量 T:", tvec.flatten())
+                print("\n完整4x4外参矩阵:")
                 print(extrinsic_matrix)
+                
+                # 验证变换矩阵
+                print(f"\n变换矩阵验证:")
+                print(f"  行列式: {np.linalg.det(rotation_matrix):.6f} " 
+                      f"(理想值接近1.0)")
+                print(f"  平移距离: {np.linalg.norm(tvec):.4f} 米")
                 
                 # 计算重投影误差
                 projected_points, _ = cv2.projectPoints(

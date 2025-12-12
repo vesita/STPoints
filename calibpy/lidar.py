@@ -53,27 +53,38 @@ class Lidar:
         bx.from_file(config.label)
         self.bounding_box = bx
         
+        # 添加调试信息
+        print(f"LiDAR点云文件: {config.cloud}")
+        print(f"LiDAR标签文件: {config.label}")
+        print(f"LiDAR点云点数: {len(self.cloud.points)}")
+        
     def target_cloud_self(self):
         return [point for point in self.cloud.points if self.bounding_box.inside(point)]
     
     def target_cloud(self):
+        """
+        获取LiDAR坐标系中的目标点云
+        注意：这里返回的是LiDAR坐标系中的点，不是世界坐标系中的点
+        """
         points = self.target_cloud_self()
         # 如果没有点在包围盒内，返回空列表而不是 None
         if len(points) == 0:
             return []
-            
-        trans2world = np.linalg.inv(self.extrinsic)
-        # 将点转换为齐次坐标进行变换
-        transformed_points = []
-        for point in points:
-            homogenous_point = np.append(np.array(point), 1)
-            transformed_point = trans2world @ homogenous_point
-            transformed_points.append(transformed_point[:3])  # 只取x,y,z坐标
-        return transformed_points
+        return points
     
     def target_corners(self):
+        """
+        获取LiDAR坐标系中的棋盘格角点，并应用坐标系变换
+        """
         cloud = self.target_cloud()
         print(f"LiDAR目标点云数量: {len(cloud)}")
+        
+        # 添加更多调试信息
+        if len(cloud) > 0:
+            points_array = np.array(cloud)
+            print(f"点云坐标范围: X[{np.min(points_array[:, 0]):.3f}, {np.max(points_array[:, 0]):.3f}], "
+                  f"Y[{np.min(points_array[:, 1]):.3f}, {np.max(points_array[:, 1]):.3f}], "
+                  f"Z[{np.min(points_array[:, 2]):.3f}, {np.max(points_array[:, 2]):.3f}]")
         
         box = self.cloud2box(cloud)
         print(f"包围盒信息: {box}")
@@ -83,6 +94,16 @@ class Lidar:
         
         corner_board = self.corner_caliboard(corner8)
         print(f"棋盘格角点数量: {len(corner_board)}")
+        
+        # 应用坐标系变换 (ROS到OpenCV): (x, y, z) -> (z, -x, -y)
+        if len(corner_board) > 0:
+            points_array = np.array(corner_board)
+            transformed_points = np.column_stack([
+                points_array[:, 2],    # z -> x
+                -points_array[:, 0],   # -x -> y
+                -points_array[:, 1]    # -y -> z
+            ])
+            return transformed_points
         
         return corner_board
     
@@ -175,11 +196,7 @@ class Lidar:
         print(f"包围盒Y范围: [{y_min:.3f}, {y_max:.3f}]")
         print(f"包围盒Z范围: [{z_min:.3f}, {z_max:.3f}]")
         
-        # 确定哪个表面朝向相机（Z坐标最大的表面）
-        # 但在LiDAR坐标系中，我们不知道哪个表面朝向相机
-        # 需要根据包围盒的几何特征选择合适的表面
-        
-        # 选择面积最大的表面作为棋盘格所在表面
+        # 确定哪个表面朝向相机（选择面积最大的表面）
         # 计算三个表面的面积
         area_x = (y_max - y_min) * (z_max - z_min)  # YZ平面
         area_y = (x_max - x_min) * (z_max - z_min)  # XZ平面
@@ -219,95 +236,73 @@ class Lidar:
             return []
         
         # 在选定的表面上找到四个角点
-        # 按照到质心的距离排序，找到最外围的四个点
-        centroid = np.mean(surface_points, axis=0)
-        distances = np.linalg.norm(surface_points - centroid, axis=1)
-        
-        # 找到距离质心最远的点作为参考
-        farthest_idx = np.argmax(distances)
-        farthest_point = surface_points[farthest_idx]
-        
-        # 找到与最远点距离最远的点
-        distances_to_farthest = np.linalg.norm(surface_points - farthest_point, axis=1)
-        opposite_idx = np.argmax(distances_to_farthest)
-        opposite_point = surface_points[opposite_idx]
-        
-        # 在剩下的点中找到另外两个角点
-        remaining_indices = [i for i in range(len(surface_points)) if i not in [farthest_idx, opposite_idx]]
-        if len(remaining_indices) >= 2:
-            # 计算剩余点到已选两点连线的距离
-            remaining_points = surface_points[remaining_indices]
-            
-            # 计算点到线段的距离
-            def point_to_line_distance(p, a, b):
-                # 点p到线段ab的距离
-                ap = p - a
-                ab = b - a
-                ab_sq = np.dot(ab, ab)
-                if ab_sq == 0:
-                    return np.linalg.norm(ap)
-                t = max(0, min(1, np.dot(ap, ab) / ab_sq))
-                projection = a + t * ab
-                return np.linalg.norm(p - projection)
-            
-            distances1 = [point_to_line_distance(p, farthest_point, opposite_point) for p in remaining_points]
-            max_dist_idx1 = np.argmax(distances1)
-            third_point = remaining_points[max_dist_idx1]
-            
-            # 移除第三个点，找第四个点
-            remaining_indices2 = [i for i in remaining_indices if i != remaining_indices[max_dist_idx1]]
-            if len(remaining_indices2) >= 1:
-                remaining_points2 = surface_points[remaining_indices2]
-                distances2 = [point_to_line_distance(p, farthest_point, opposite_point) for p in remaining_points2]
-                max_dist_idx2 = np.argmax(distances2)
-                fourth_point = remaining_points2[max_dist_idx2]
-            else:
-                # 如果找不到第四个点，使用质心附近的一个点
-                closest_to_centroid_idx = np.argmin(distances)
-                fourth_point = surface_points[closest_to_centroid_idx]
-        else:
-            # 如果点不够，使用简单方法
-            sorted_indices = np.argsort(distances_to_farthest)
-            third_point = surface_points[sorted_indices[-2]] if len(sorted_indices) >= 2 else surface_points[0]
-            fourth_point = surface_points[sorted_indices[-3]] if len(sorted_indices) >= 3 else surface_points[1]
-        
-        # 确定四个角点的相对位置
-        # 按照某种规则排序四个点
-        four_corners = [farthest_point, opposite_point, third_point, fourth_point]
-        
-        # 按照坐标的大小关系来确定角点位置
-        # 首先确定是在哪个平面上
+        # 使用更稳定的方法找到角点
         if plane_type == "YZ":
             # YZ平面，使用y和z坐标
-            coords = [(p[1], p[2]) for p in four_corners]  # (y, z)
+            coords = [(p[1], p[2]) for p in surface_points]  # (y, z)
         elif plane_type == "XZ":
             # XZ平面，使用x和z坐标
-            coords = [(p[0], p[2]) for p in four_corners]  # (x, z)
+            coords = [(p[0], p[2]) for p in surface_points]  # (x, z)
         else:
             # XY平面，使用x和y坐标
-            coords = [(p[0], p[1]) for p in four_corners]  # (x, y)
+            coords = [(p[0], p[1]) for p in surface_points]  # (x, y)
         
-        # 根据坐标值确定四个角点
-        # 创建坐标索引对
-        indexed_coords = [(coords[i][0], coords[i][1], i) for i in range(4)]
+        # 找到四个角点：最小/最大y和z（或x和z，或x和y）组合
+        coord_array = np.array(coords)
+        min_y_idx = np.argmin(coord_array[:, 0])
+        max_y_idx = np.argmax(coord_array[:, 0])
+        min_z_idx = np.argmin(coord_array[:, 1])
+        max_z_idx = np.argmax(coord_array[:, 1])
         
-        # 按照y值排序
-        sorted_by_y = sorted(indexed_coords, key=lambda x: x[0])
-        top_two = sorted_by_y[:2]   # y值较小的两个点
-        bottom_two = sorted_by_y[2:] # y值较大的两个点
+        # 构造四个角点
+        top_left_idx = min_y_idx if coord_array[min_y_idx, 1] <= coord_array[min_z_idx, 1] else min_z_idx
+        top_right_idx = min_y_idx if coord_array[min_y_idx, 1] >= coord_array[max_z_idx, 1] else max_z_idx
+        bottom_left_idx = max_y_idx if coord_array[max_y_idx, 1] <= coord_array[min_z_idx, 1] else min_z_idx
+        bottom_right_idx = max_y_idx if coord_array[max_y_idx, 1] >= coord_array[max_z_idx, 1] else max_z_idx
         
-        # 在上面两个点中，按照x值排序确定左右
-        top_left_idx = min(top_two, key=lambda x: x[1])[2]
-        top_right_idx = max(top_two, key=lambda x: x[1])[2]
+        # 确保索引不重复
+        indices = list(set([top_left_idx, top_right_idx, bottom_left_idx, bottom_right_idx]))
+        if len(indices) < 4:
+            # 如果索引重复，则使用简单的极值方法
+            y_vals = coord_array[:, 0]
+            z_vals = coord_array[:, 1]
+            
+            # 找到四个象限的点
+            y_median = np.median(y_vals)
+            z_median = np.median(z_vals)
+            
+            quadrants = [[] for _ in range(4)]  # topLeft, topRight, bottomLeft, bottomRight
+            for i, (y, z) in enumerate(coord_array):
+                if y <= y_median and z <= z_median:
+                    quadrants[0].append((i, y, z))
+                elif y <= y_median and z > z_median:
+                    quadrants[1].append((i, y, z))
+                elif y > y_median and z <= z_median:
+                    quadrants[2].append((i, y, z))
+                else:
+                    quadrants[3].append((i, y, z))
+            
+            # 从每个象限中选择一个代表点（距离质心最近的点）
+            representative_points = []
+            for quadrant in quadrants:
+                if quadrant:
+                    # 计算象限质心
+                    quad_y = np.mean([p[1] for p in quadrant])
+                    quad_z = np.mean([p[2] for p in quadrant])
+                    # 找到距离质心最近的点
+                    distances = [np.sqrt((p[1]-quad_y)**2 + (p[2]-quad_z)**2) for p in quadrant]
+                    min_idx = np.argmin(distances)
+                    representative_points.append(quadrant[min_idx][0])
+                else:
+                    # 如果象限为空，使用最近的点
+                    representative_points.append(0)
+            
+            top_left_idx, top_right_idx, bottom_left_idx, bottom_right_idx = representative_points[:4]
         
-        # 在下面两个点中，按照x值排序确定左右
-        bottom_left_idx = min(bottom_two, key=lambda x: x[1])[2]
-        bottom_right_idx = max(bottom_two, key=lambda x: x[1])[2]
-        
-        top_left = four_corners[top_left_idx]
-        top_right = four_corners[top_right_idx]
-        bottom_left = four_corners[bottom_left_idx]
-        bottom_right = four_corners[bottom_right_idx]
+        top_left = surface_points[top_left_idx]
+        top_right = surface_points[top_right_idx]
+        bottom_left = surface_points[bottom_left_idx]
+        bottom_right = surface_points[bottom_right_idx]
         
         print(f"确定的四个角点:")
         print(f"  左上角: ({top_left[0]:.3f}, {top_left[1]:.3f}, {top_left[2]:.3f})")
@@ -315,35 +310,8 @@ class Lidar:
         print(f"  左下角: ({bottom_left[0]:.3f}, {bottom_left[1]:.3f}, {bottom_left[2]:.3f})")
         print(f"  右下角: ({bottom_right[0]:.3f}, {bottom_right[1]:.3f}, {bottom_right[2]:.3f})")
         
-        # 检查角点是否在一条直线上，如果是则需要特殊处理
-        def points_collinear(p1, p2, p3, tolerance=1e-6):
-            # 检查三点是否共线
-            v1 = p2 - p1
-            v2 = p3 - p1
-            cross_product = np.cross(v1, v2)
-            return np.linalg.norm(cross_product) < tolerance
-        
-        # 如果角点有问题，尝试重新排列
-        if points_collinear(top_left, top_right, bottom_left) or \
-           points_collinear(top_left, top_right, bottom_right) or \
-           points_collinear(top_left, bottom_left, bottom_right) or \
-           points_collinear(top_right, bottom_left, bottom_right):
-            print("警告：检测到角点共线，尝试重新排列")
-            # 简单地按照索引分配
-            top_left = four_corners[0]
-            top_right = four_corners[1]
-            bottom_left = four_corners[2]
-            bottom_right = four_corners[3]
-            
-            print(f"重新分配的四个角点:")
-            print(f"  左上角: ({top_left[0]:.3f}, {top_left[1]:.3f}, {top_left[2]:.3f})")
-            print(f"  右上角: ({top_right[0]:.3f}, {top_right[1]:.3f}, {top_right[2]:.3f})")
-            print(f"  左下角: ({bottom_left[0]:.3f}, {bottom_left[1]:.3f}, {bottom_left[2]:.3f})")
-            print(f"  右下角: ({bottom_right[0]:.3f}, {bottom_right[1]:.3f}, {bottom_right[2]:.3f})")
-        
         # 生成棋盘格点 (6列7行)
         board_points = []
-        rows, cols = 7, 6  # 7行6列
         for i in range(rows):  # 7行
             for j in range(cols):  # 6列
                 # 双线性插值计算点坐标
