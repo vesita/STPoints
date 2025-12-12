@@ -207,16 +207,51 @@ def main():
             print(f"  camera_matrix类型: {type(camera_matrix)}, 形状: {camera_matrix.shape if hasattr(camera_matrix, 'shape') else '无形状属性'}")
             print(f"  dist_coeffs类型: {type(dist_coeffs)}, 形状: {dist_coeffs.shape if hasattr(dist_coeffs, 'shape') else '无形状属性'}")
             
-            # 使用solvePnP计算外参
-            success, rvec, tvec = cv2.solvePnP(
-                object_points, 
-                image_points, 
-                camera_matrix, 
-                dist_coeffs,
-                flags=cv2.SOLVEPNP_ITERATIVE
-            )
+            # 尝试不同的solvePnP方法
+            methods = [
+                (cv2.SOLVEPNP_ITERATIVE, "SOLVEPNP_ITERATIVE"),
+                (cv2.SOLVEPNP_P3P, "SOLVEPNP_P3P"),
+                (cv2.SOLVEPNP_AP3P, "SOLVEPNP_AP3P"),
+                (cv2.SOLVEPNP_EPNP, "SOLVEPNP_EPNP"),
+                (cv2.SOLVEPNP_IPPE, "SOLVEPNP_IPPE")
+            ]
             
-            if success:
+            best_result = None
+            best_error = float('inf')
+            
+            for method_flag, method_name in methods:
+                try:
+                    print(f"尝试方法: {method_name}")
+                    success, rvec, tvec = cv2.solvePnP(
+                        object_points, 
+                        image_points, 
+                        camera_matrix, 
+                        dist_coeffs,
+                        flags=method_flag
+                    )
+                    
+                    if success:
+                        # 计算重投影误差
+                        projected_points, _ = cv2.projectPoints(
+                            object_points, rvec, tvec, camera_matrix, dist_coeffs)
+                        
+                        projected_points = projected_points.reshape(-1, 2)
+                        reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
+                        
+                        print(f"  方法 {method_name} 重投影误差: {reprojection_error:.2f} 像素")
+                        
+                        if reprojection_error < best_error:
+                            best_error = reprojection_error
+                            best_result = (success, rvec, tvec, method_name)
+                    else:
+                        print(f"  方法 {method_name} 求解失败")
+                except Exception as e:
+                    print(f"  方法 {method_name} 出错: {e}")
+            
+            if best_result:
+                success, rvec, tvec, method_name = best_result
+                print(f"选择最佳方法: {method_name}，误差: {best_error:.2f} 像素")
+                
                 # 将旋转向量转换为旋转矩阵
                 rotation_matrix, _ = cv2.Rodrigues(rvec)
                 
@@ -236,7 +271,7 @@ def main():
                 projected_points = projected_points.reshape(-1, 2)
                 reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
                 
-                print(f"重投影误差: {reprojection_error} 像素")
+                print(f"最终重投影误差: {reprojection_error} 像素")
                 
                 # 询问用户是否保存标定结果
                 save_choice = input("是否将标定结果保存并覆盖相机外参？(y/N): ")
@@ -258,7 +293,7 @@ def main():
                 else:
                     print("未保存相机外参")
             else:
-                print("PnP问题求解失败")
+                print("所有PnP方法都失败了")
         else:
             print(f"点数量不匹配: 3D点 ({len(caliboard3D)}) vs 2D点 ({len(caliboard2D)})")
     else:

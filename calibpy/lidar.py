@@ -275,14 +275,34 @@ class Lidar:
         # 按照某种规则排序四个点
         four_corners = [farthest_point, opposite_point, third_point, fourth_point]
         
-        # 按照x+y的和排序，找到左上角和右下角
-        sum_coords = [p[0] + p[1] for p in four_corners]
-        diff_coords = [p[0] - p[1] for p in four_corners]
+        # 按照坐标的大小关系来确定角点位置
+        # 首先确定是在哪个平面上
+        if plane_type == "YZ":
+            # YZ平面，使用y和z坐标
+            coords = [(p[1], p[2]) for p in four_corners]  # (y, z)
+        elif plane_type == "XZ":
+            # XZ平面，使用x和z坐标
+            coords = [(p[0], p[2]) for p in four_corners]  # (x, z)
+        else:
+            # XY平面，使用x和y坐标
+            coords = [(p[0], p[1]) for p in four_corners]  # (x, y)
         
-        top_left_idx = np.argmin(sum_coords)
-        bottom_right_idx = np.argmax(sum_coords)
-        bottom_left_idx = np.argmin(diff_coords)
-        top_right_idx = np.argmax(diff_coords)
+        # 根据坐标值确定四个角点
+        # 创建坐标索引对
+        indexed_coords = [(coords[i][0], coords[i][1], i) for i in range(4)]
+        
+        # 按照y值排序
+        sorted_by_y = sorted(indexed_coords, key=lambda x: x[0])
+        top_two = sorted_by_y[:2]   # y值较小的两个点
+        bottom_two = sorted_by_y[2:] # y值较大的两个点
+        
+        # 在上面两个点中，按照x值排序确定左右
+        top_left_idx = min(top_two, key=lambda x: x[1])[2]
+        top_right_idx = max(top_two, key=lambda x: x[1])[2]
+        
+        # 在下面两个点中，按照x值排序确定左右
+        bottom_left_idx = min(bottom_two, key=lambda x: x[1])[2]
+        bottom_right_idx = max(bottom_two, key=lambda x: x[1])[2]
         
         top_left = four_corners[top_left_idx]
         top_right = four_corners[top_right_idx]
@@ -295,8 +315,35 @@ class Lidar:
         print(f"  左下角: ({bottom_left[0]:.3f}, {bottom_left[1]:.3f}, {bottom_left[2]:.3f})")
         print(f"  右下角: ({bottom_right[0]:.3f}, {bottom_right[1]:.3f}, {bottom_right[2]:.3f})")
         
+        # 检查角点是否在一条直线上，如果是则需要特殊处理
+        def points_collinear(p1, p2, p3, tolerance=1e-6):
+            # 检查三点是否共线
+            v1 = p2 - p1
+            v2 = p3 - p1
+            cross_product = np.cross(v1, v2)
+            return np.linalg.norm(cross_product) < tolerance
+        
+        # 如果角点有问题，尝试重新排列
+        if points_collinear(top_left, top_right, bottom_left) or \
+           points_collinear(top_left, top_right, bottom_right) or \
+           points_collinear(top_left, bottom_left, bottom_right) or \
+           points_collinear(top_right, bottom_left, bottom_right):
+            print("警告：检测到角点共线，尝试重新排列")
+            # 简单地按照索引分配
+            top_left = four_corners[0]
+            top_right = four_corners[1]
+            bottom_left = four_corners[2]
+            bottom_right = four_corners[3]
+            
+            print(f"重新分配的四个角点:")
+            print(f"  左上角: ({top_left[0]:.3f}, {top_left[1]:.3f}, {top_left[2]:.3f})")
+            print(f"  右上角: ({top_right[0]:.3f}, {top_right[1]:.3f}, {top_right[2]:.3f})")
+            print(f"  左下角: ({bottom_left[0]:.3f}, {bottom_left[1]:.3f}, {bottom_left[2]:.3f})")
+            print(f"  右下角: ({bottom_right[0]:.3f}, {bottom_right[1]:.3f}, {bottom_right[2]:.3f})")
+        
         # 生成棋盘格点 (6列7行)
         board_points = []
+        rows, cols = 7, 6  # 7行6列
         for i in range(rows):  # 7行
             for j in range(cols):  # 6列
                 # 双线性插值计算点坐标

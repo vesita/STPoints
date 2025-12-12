@@ -39,7 +39,7 @@ class CalibrationVisualizer:
     
     def project_points_to_image(self, points):
         """
-        将3D点云投影到图像上
+        使用OpenCV的projectPoints函数将3D点云投影到图像上
         
         Args:
             points: 3D点云数据 (Nx3)
@@ -50,90 +50,23 @@ class CalibrationVisualizer:
         if len(points) == 0:
             return np.array([])
         
-        # 构造变换矩阵：世界坐标系 -> 相机坐标系
-        world_to_camera = self.cam.extrinsic
-        
-        # 构造齐次坐标
-        points_world_homo = np.hstack([points, np.ones((points.shape[0], 1))])
-        
-        # 变换到相机坐标系
-        points_camera_homo = (world_to_camera @ points_world_homo.T).T
-        
-        # 检查是否在相机前方（Z坐标为正）
-        valid_indices = points_camera_homo[:, 2] > 0
-        points_camera = points_camera_homo[valid_indices, :3]
-        
-        print(f"在相机前方的点数量: {np.sum(valid_indices)} / {len(points)}")
-        
-        if len(points_camera) == 0:
-            return np.array([])
-        
-        # 先进行透视除法得到归一化图像坐标 (x/z, y/z)
-        normalized_points = points_camera[:, :2] / points_camera[:, 2:3]
-        
-        # 获取畸变系数
+        # 使用与calib.py中相同的投影方法
+        camera_matrix = self.cam.intrinsic
         dist_coeffs = self.cam.distortion_coefficients
         
-        # 应用畸变效果（使点云匹配相机畸变）
-        if len(dist_coeffs) >= 5 and not np.all(dist_coeffs == 0):
-            # 标准OpenCV模型 (前5个系数)
-            k1, k2, p1, p2, k3 = dist_coeffs[0], dist_coeffs[1], dist_coeffs[2], dist_coeffs[3], dist_coeffs[4]
-            
-            x = normalized_points[:, 0]
-            y = normalized_points[:, 1]
-            
-            # 径向畸变计算
-            r2 = x*x + y*y
-            r4 = r2*r2
-            r6 = r4*r2
-            
-            # 径向畸变因子
-            radial_factor = 1 + k1*r2 + k2*r4 + k3*r6
-            
-            # 切向畸变计算
-            xy2 = 2*x*y
-            x2 = 2*x*x
-            y2 = 2*y*y
-            tangent_x = p1*xy2 + p2*(r2 + x2)
-            tangent_y = p1*(r2 + y2) + p2*xy2
-            
-            # 应用畸变（添加畸变效果，使点云匹配相机的畸变）
-            distorted_x = (x - tangent_x) / radial_factor
-            distorted_y = (y - tangent_y) / radial_factor
-            
-            distorted_points = np.column_stack([distorted_x, distorted_y])
-        else:
-            # 没有畸变或畸变系数为0
-            distorted_points = normalized_points
-            
-        # 转换为像素坐标 (使用内参矩阵)
-        # [u]   [fx  0  cx] [x']
-        # [v] = [ 0 fy  cy] [y']
-        # [1]   [ 0  0  1] [1 ]
-        fx = self.cam.intrinsic[0, 0]
-        fy = self.cam.intrinsic[1, 1]
-        cx = self.cam.intrinsic[0, 2]
-        cy = self.cam.intrinsic[1, 2]
+        # 从外参矩阵提取旋转向量和平移向量
+        rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
+        tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)
         
-        projected_points = np.zeros_like(distorted_points)
-        projected_points[:, 0] = distorted_points[:, 0] * fx + cx
-        projected_points[:, 1] = distorted_points[:, 1] * fy + cy
+        # 使用cv2.projectPoints进行投影
+        projected_points, _ = cv2.projectPoints(
+            np.array(points, dtype=np.float32), 
+            rvec, tvec, 
+            camera_matrix, 
+            dist_coeffs
+        )
         
-        # 检查投影点是否在图像范围内 (从图像获取实际尺寸)
-        if self.cam.image is not None:
-            img_width, img_height = self.cam.image.size
-            valid_x = (projected_points[:, 0] >= 0) & (projected_points[:, 0] < img_width)
-            valid_y = (projected_points[:, 1] >= 0) & (projected_points[:, 1] < img_height)
-            valid_indices_img = valid_x & valid_y
-            
-            print(f"在图像范围内的点数量: {np.sum(valid_indices_img)} / {len(projected_points)}")
-            if np.sum(valid_indices_img) > 0:
-                print("前5个在图像范围内的点坐标:")
-                print(projected_points[valid_indices_img][:5])
-        else:
-            print("警告：未加载相机图像，无法检查点是否在图像范围内")
-        
-        return projected_points
+        return projected_points.reshape(-1, 2)
     
     def img_cloud_mapping(self, save_image=True):
         """
@@ -154,10 +87,29 @@ class CalibrationVisualizer:
         
         # 获取LiDAR投影的标定板角点
         lidar_board_corners = self.lid.target_corners()
-        lidar_projected_corners = self.project_points_to_image(lidar_board_corners)
+        print(f"LiDAR棋盘格角点数量: {len(lidar_board_corners)}")
+        print("前10个LiDAR棋盘格角点:")
+        print(lidar_board_corners[:10] if len(lidar_board_corners) > 0 else "无数据")
+        
+        # 使用cv2.projectPoints进行投影
+        rvec, _ = cv2.Rodrigues(self.cam.extrinsic[:3, :3])
+        tvec = self.cam.extrinsic[:3, 3].reshape(-1, 1)
+        print(f"旋转矩阵 (rvec):\n{rvec}")
+        print(f"平移向量 (tvec):\n{tvec}")
+        
+        lidar_projected_corners, _ = cv2.projectPoints(
+            np.array(lidar_board_corners, dtype=np.float32), 
+            rvec, tvec, 
+            self.cam.intrinsic, 
+            self.cam.distortion_coefficients
+        )
+        lidar_projected_corners = lidar_projected_corners.reshape(-1, 2)
         
         # 获取图像中检测到的棋盘格角点
         image_corners = self.cam.get_caliboard()
+        print(f"图像检测角点数量: {len(image_corners)}")
+        print("前10个图像检测角点:")
+        print(image_corners[:10] if len(image_corners) > 0 else "无数据")
         
         print(f"LiDAR投影角点数量: {len(lidar_projected_corners)}")
         print(f"图像检测角点数量: {len(image_corners)}")
@@ -199,11 +151,18 @@ class CalibrationVisualizer:
         print(projected_points[:10])
         print("前10个图像检测点:")
         print(image_corners[:10])
+        
+        # 确保点数量一致
+        num_points = min(len(image_corners), len(projected_points))
+        image_corners_subset = image_corners[:num_points]
+        projected_points_subset = projected_points[:num_points]
+        
         # 使用欧氏距离的均方根作为重投影误差
-        reprojection_error = np.sqrt(np.mean((image_corners - projected_points) ** 2))
+        reprojection_error = np.sqrt(np.mean((image_corners_subset - projected_points_subset) ** 2))
         
         print(f"重投影误差统计:")
         print(f"  平均误差: {reprojection_error:.2f} 像素")
+        print(f"  使用点数: {num_points}")
         
         # 在图像上显示误差信息
         cv2.putText(image_cv, f'重投影误差: {reprojection_error:.2f} 像素', 
