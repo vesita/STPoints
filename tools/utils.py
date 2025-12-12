@@ -1,3 +1,7 @@
+
+
+
+
 import numpy as np
 import os
 from PIL import Image
@@ -5,11 +9,13 @@ import json
 import math
 import pypcd.pypcd as pypcd
 
-def read_scene_meta(scene):
+def read_scene_meta(scene, lidar_path = None):
     'read scene metadata give scene path'
     meta = {}
 
-    frames = os.listdir(os.path.join(scene, 'lidar'))
+    if lidar_path is None:
+        lidar_path = scene
+    frames = os.listdir(os.path.join(lidar_path, 'lidar'))
     frames = [*map(lambda f: os.path.splitext(f)[0], frames)]
     frames.sort()
     meta['frames'] = frames
@@ -83,19 +89,24 @@ def read_all_obj_ids(scene):
 
 
 class SuscapeScene:
-    def __init__(self, data_root, name, lidar=None):
+    def __init__(self, data_root, name, lidar=None, label_folder=None):
         self.name = name
         self.data_root = data_root
         self.scene_path = os.path.join(data_root, name)
-        self.meta = read_scene_meta(self.scene_path)
-        self.labels = None
+        if lidar is None:
+            self.lidar_path = self.scene_path
+        else:
+            self.lidar_path = os.path.join(lidar, name)
 
+        self.meta = read_scene_meta(self.scene_path, self.lidar_path)
+        self.labels = None
+        self.label_folder = label_folder if label_folder else 'label'
         # specified lidar path
         self.lidar_root = lidar if lidar else data_root
         self.lidar_path = os.path.join(self.lidar_root, name, 'lidar')
     
     def load_labels(self):
-        label_folder = os.path.join(self.scene_path, "label")
+        label_folder = os.path.join(self.scene_path, self.label_folder)
         
         self.labels = {}
         for frame in self.meta['frames']:
@@ -107,7 +118,12 @@ class SuscapeScene:
                 continue
 
             with open(os.path.join(label_folder, file)) as f:
-                labels = json.load(f)
+                
+                try:
+                    labels = json.load(f)
+                except:
+                    print("error in reading file", file)
+                    continue
 
                 if "objs" in labels:
                     objs = labels['objs']
@@ -115,7 +131,9 @@ class SuscapeScene:
                     objs = labels
                 
                 self.labels[frame] = objs
-        
+    
+
+
     def get_boxes_by_frame(self, frame):
         if not self.labels:
             self.load_labels()
@@ -139,6 +157,8 @@ class SuscapeScene:
         return ret
     
     def find_box_in_frame(self, frame, id):
+        if frame not in self.labels:
+            return None
         return self._find_obj_by_id(self.labels[frame], id)
     
 
@@ -213,6 +233,24 @@ class SuscapeScene:
             pose = json.load(f)
             return pose
 
+    def load_ego_pose(self):
+        ego_pose_folder = os.path.join(self.scene_path, "ego_pose")
+        self.ego_pose = {}
+        for frame in self.meta['frames']:
+            file = frame + '.json'
+            with open(os.path.join(ego_pose_folder, file)) as f:
+                self.ego_pose[frame] = json.load(f)
+        
+        return self.ego_pose
+    
+    def ego_pose_to_lidar_pose_rotate_matrix(self, p):
+        eu = [float(p['roll']), float(p['pitch']), float(p['yaw'])]
+        t = [float(p['x']), float(p['y']), float(p['z'])]
+
+        return euler_angle_to_rotate_matrix(eu, t)
+
+
+    
 def euler_angle_to_rotate_matrix(eu, t):  # ZYX order.
     theta = eu
     #Calculate rotation about x axis
@@ -240,6 +278,32 @@ def euler_angle_to_rotate_matrix(eu, t):  # ZYX order.
     t = t.reshape([-1,1])
     R = np.concatenate([R,t], axis=-1)
     R = np.concatenate([R, np.array([0,0,0,1]).reshape([1,-1])], axis=0)
+    return R
+
+# default rotation order: xyz
+def euler_angle_to_rotate_matrix_3x3(eu):
+    theta = eu
+    #Calculate rotation about x axis
+    R_x = np.array([
+        [1,       0,              0],
+        [0,       math.cos(theta[0]),   -math.sin(theta[0])],
+        [0,       math.sin(theta[0]),   math.cos(theta[0])]
+    ])
+
+    #Calculate rotation about y axis
+    R_y = np.array([
+        [math.cos(theta[1]),      0,      math.sin(theta[1])],
+        [0,                       1,      0],
+        [-math.sin(theta[1]),     0,      math.cos(theta[1])]
+    ])
+
+    #Calculate rotation about z axis
+    R_z = np.array([
+        [math.cos(theta[2]),    -math.sin(theta[2]),      0],
+        [math.sin(theta[2]),    math.cos(theta[2]),       0],
+        [0,               0,                  1]])
+
+    R = np.matmul(R_x, np.matmul(R_y, R_z))
     return R
 
 
@@ -362,31 +426,6 @@ def choose_best_camera_for_obj(obj, scene_path, meta, camera_type, cameras, fram
         return None
     
 
-# default rotation order: xyz
-def euler_angle_to_rotate_matrix_3x3(eu):
-    theta = eu
-    #Calculate rotation about x axis
-    R_x = np.array([
-        [1,       0,              0],
-        [0,       math.cos(theta[0]),   -math.sin(theta[0])],
-        [0,       math.sin(theta[0]),   math.cos(theta[0])]
-    ])
-
-    #Calculate rotation about y axis
-    R_y = np.array([
-        [math.cos(theta[1]),      0,      math.sin(theta[1])],
-        [0,                       1,      0],
-        [-math.sin(theta[1]),     0,      math.cos(theta[1])]
-    ])
-
-    #Calculate rotation about z axis
-    R_z = np.array([
-        [math.cos(theta[2]),    -math.sin(theta[2]),      0],
-        [math.sin(theta[2]),    math.cos(theta[2]),       0],
-        [0,               0,                  1]])
-
-    R = np.matmul(R_x, np.matmul(R_y, R_z))
-    return R
 
 
 def crop_box_pts(pts, box, ground_level=0.3):
