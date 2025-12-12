@@ -1,65 +1,94 @@
-
 import {rotation_matrix_to_euler_angle,euler_angle_to_rotate_matrix, matmul, transpose} from "./util.js"
 //import {render_2d_image, update_image_box_projection} from "./image.js"
 
+/**
+ * 相机标定类
+ * @param {Object} data - 数据对象
+ * @param {Object} editor - 编辑器对象
+ */
 function Calib(data, editor){
     this.data = data;
     this.editor = editor;
 
+    // 欧拉角和位移变量
     var euler_angle={x:0, y:0, y:0};
     var translate = {x:0, y:0, z:0};
     
+    /**
+     * 保存标定结果
+     */
     this.save_calibration = function(){
-    
-        
+        // 获取当前场景元数据
         var scene_meta = data.meta[data.world.frameInfo.scene];
     
-    
+        // 获取当前活动相机
         var active_camera_name = data.world.cameras.active_name;
         var calib = scene_meta.calib.camera[active_camera_name]
         
+        // 获取相机外参矩阵
         var extrinsic = calib.extrinsic.map(function(x){return x*1.0;});
     
+        // 从外参矩阵计算欧拉角和位移
         euler_angle = rotation_matrix_to_euler_angle(extrinsic);
         translate = {
-            x: extrinsic[3]*1.0,
-            y: extrinsic[7]*1.0,
-            z: extrinsic[11]*1.0,
+            x: extrinsic[3]*1.0,           // X轴位移
+            y: extrinsic[7]*1.0,           // Y轴位移
+            z: extrinsic[11]*1.0,          // Z轴位移
         };
-    
     
         console.log(extrinsic, euler_angle, translate);
     
+        // 根据欧拉角和位移重建变换矩阵
         let matrix =  euler_angle_to_rotate_matrix(euler_angle, translate)
         console.log("restoreed matrix",matrix);
     
-        
+        // 在信息框中显示标定结果
         this.editor.infoBox.show("calib", JSON.stringify(matrix));
     }
     
+    /**
+     * 重置标定
+     */
     this.reset_calibration = function(){
-        // to be done
+        // 待实现
         this.editor.imageContextManager.render_2d_image();
     }
     
+    // 标定立方体对象
     this.calib_box = null;
     
+    /**
+     * 显示相机位置
+     */
     this.show_camera_pos = function(){
         this.editor.viewManager.mainView.dumpPose();
     };
 
     
-    // show a manipulating box
+    /**
+     * 开始标定过程 - 显示一个可操作的立方体
+     */
     this.start_calibration = function(){
+        // 获取场景元数据
         var scene_meta = this.data.meta[data.world.frameInfo.scene];
     
+        // 获取当前活动相机的标定参数
         var active_camera_name = this.data.world.cameras.active_name;
         var calib = scene_meta.calib.camera[active_camera_name]
         var extrinsic = calib.extrinsic.map(function(x){return x*1.0;});
-        let viewMatrix = [0, -1,  0,  0,  //row vector
+        
+        // 视图变换矩阵 - 用于坐标系转换
+        // 先绕z轴旋转90度再绕x轴旋转90度
+        let viewMatrix = [0, -1,  0,  0,  //行向量表示
                         0, 0,  -1, 0,
                         1, 0,  0,  0,
                         0, 0,  0,  1];
+        
+        /**
+         * 转置变换矩阵
+         * @param {Array} m - 4x4矩阵
+         * @returns {Array} 转置后的矩阵
+         */
         function transpose_transmatrix(m){
             //m=4*4
             return [
@@ -71,20 +100,22 @@ function Calib(data, editor){
             ];
         }
 
+        // 计算操作矩阵：视图矩阵 * 外参矩阵
         var op_matrix = matmul (transpose_transmatrix(viewMatrix),
                                 transpose_transmatrix(extrinsic), 4);
 
+        // 从操作矩阵计算欧拉角
         var euler_angle = rotation_matrix_to_euler_angle(op_matrix);
         var translate = {
-            x: extrinsic[3]*1.0,
-            y: extrinsic[7]*1.0,
-            z: extrinsic[11]*1.0,
+            x: extrinsic[3]*1.0,      // X轴位移
+            y: extrinsic[7]*1.0,      // Y轴位移
+            z: extrinsic[11]*1.0,     // Z轴位移
         };
     
         console.log(euler_angle, translate);
         this.show_camera_pos();
 
-        
+        // 如果标定立方体不存在，则创建一个新的
         if (!this.calib_box)
         {
             this.calib_box = this.data.world.annotation.createCuboid(
@@ -93,20 +124,22 @@ function Calib(data, editor){
                     y: translate.y,// + this.data.world.coordinatesOffset[1],
                     z: translate.z, // + this.data.world.coordinatesOffset[2]
                 }, 
-                {x:1,y:1, z:1}, 
+                {x:1,y:1, z:1},   // 尺寸
                 {
-                    x: euler_angle.x,
-                    y: euler_angle.y,
-                    z: euler_angle.z
+                    x: euler_angle.x,  // 绕X轴旋转
+                    y: euler_angle.y,  // 绕Y轴旋转
+                    z: euler_angle.z   // 绕Z轴旋转
                 }, 
                 "camera", 
                 "camera"
             );
 
+            // 将标定立方体添加到场景中
             this.data.world.scene.add(this.calib_box);
             
         }
         else{
+            // 如果标定立方体已存在，则更新其位置和旋转
             console.log("calib box exists.");
             this.calib_box.position.x = translate.x;// + this.data.world.coordinatesOffset[0];
             this.calib_box.position.y = translate.y;// + this.data.world.coordinatesOffset[1];
@@ -120,31 +153,36 @@ function Calib(data, editor){
         console.log(this.calib_box);
         this.editor.render();
 
-        
+        // 设置标定立方体变化时的回调函数
         this.calib_box.on_box_changed = ()=>{
             console.log("calib box changed.");
 
+            // 获取立方体的实际位置
             let real_pos = {
                 x: this.calib_box.position.x,// - this.data.world.coordinatesOffset[0],
                 y: this.calib_box.position.y,// - this.data.world.coordinatesOffset[1],
                 z: this.calib_box.position.z,// - this.data.world.coordinatesOffset[2],
             };
 
+            // 根据立方体的旋转和位置计算新的外参矩阵
             let extrinsic = euler_angle_to_rotate_matrix(this.calib_box.rotation, real_pos);
+            
+            // 应用视图变换矩阵并更新标定参数
             calib.extrinsic = transpose_transmatrix(matmul (viewMatrix, extrinsic, 4));
             console.log("extrinsic", calib.extrinsic)
             console.log("euler", euler_angle, "translate", translate);    
         
+            // 重新渲染2D图像
             this.editor.imageContextManager.render_2d_image();
         }
-
-
-        
     };
     
+    /**
+     * 停止标定过程
+     */
     function stop_calibration()
     {
-        //tbd
+        // 待实现
     };
     
     /*
@@ -192,5 +230,5 @@ function Calib(data, editor){
     
 };
 
-
+// 导出Calib类
 export {Calib}

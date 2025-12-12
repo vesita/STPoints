@@ -3,15 +3,24 @@ import {vector4to3, vector3_nomalize, psr_to_xyz, matmul} from "./util.js"
 import {globalObjectCategory, } from './obj_cfg.js';
 import { MovableView } from "./popup_dialog.js";
 
+/**
+ * 盒子图像上下文类，用于处理3D盒子在图像上的投影显示
+ * @param {HTMLElement} ui - 画布UI元素
+ */
 function BoxImageContext(ui){
 
     this.ui = ui;
     
-    // draw highlighted box
+    /**
+     * 更新焦点盒子的图像上下文，在图像上绘制高亮选中的3D盒子
+     * @param {Object} box - 要绘制的3D盒子对象
+     * @returns {void} 如果无法绘制则直接返回
+     */
     this.updateFocusedImageContext = function(box){
+        // 获取场景元数据
         var scene_meta = box.world.frameInfo.sceneMeta;
 
-
+        // 选择最适合显示该盒子的相机视角
         let bestImage = choose_best_camera_for_point(
             scene_meta,
             box.position);
@@ -198,9 +207,17 @@ function BoxImageContext(ui){
 
 class ImageContext extends MovableView{
 
+    /**
+     * 图像上下文类，用于处理相机图像的显示和交互
+     * @param {HTMLElement} parentUi - 父级UI元素
+     * @param {string} name - 图像名称
+     * @param {boolean} autoSwitch - 是否自动切换
+     * @param {Object} cfg - 配置对象
+     * @param {Function} on_img_click - 图像点击回调函数
+     */
     constructor(parentUi, name, autoSwitch, cfg, on_img_click){
 
-        // create ui
+        // 创建UI
         let template = document.getElementById("image-wrapper-template");
         let tool = template.content.cloneNode(true);
         // this.boxEditorHeaderUi.appendChild(tool);
@@ -218,11 +235,13 @@ class ImageContext extends MovableView{
         this.setImageName(name);
     }
     
+    // 移除UI元素
     remove(){
         this.ui.remove();    
     }
 
 
+    // 设置图像名称
     setImageName(name)
     {
         this.name = name;
@@ -233,6 +252,7 @@ class ImageContext extends MovableView{
     get_selected_box = null;
 
 
+    // 初始化图像操作
     init_image_op(func_get_selected_box){
         this.ui.onclick = (e)=>this.on_click(e);
         this.get_selected_box = func_get_selected_box;
@@ -241,6 +261,8 @@ class ImageContext extends MovableView{
         
         // c.onresize = on_resize;
     }
+    
+    // 清空主画布
     clear_main_canvas(){
 
         var boxes = this.ui.querySelector("#svg-boxes").children;
@@ -268,18 +290,22 @@ class ImageContext extends MovableView{
     world = null;
     img = null;
 
+    // 关联世界对象
     attachWorld(world){
             this.world = world;
     };
 
+    // 隐藏图像
     hide (){
         this.ui.style.display="none";
     };
 
+    // 检查是否隐藏
     hidden(){
             this.ui.style.display=="none";
         };
 
+    // 显示图像
     show(){
             this.ui.style.display="";
         };
@@ -290,22 +316,24 @@ class ImageContext extends MovableView{
     points = [];
     polyline;
 
-    all_lines=[];
-    
+    // 根据距离确定点的颜色
     img_lidar_point_map = {};
 
     point_color_by_distance(x,y)
     {
-        // x,y are image coordinates
+        // x,y 是图像坐标
         let p = this.img_lidar_point_map[y*this.img.width+x];
 
+        // 计算点到传感器的距离
         let distance = Math.sqrt(p[1]*p[1] + p[2]*p[2] + p[3]*p[3] );
 
+        // 限制距离范围在10-60米之间
         if (distance > 60.0)
             distance = 60.0;
         else if (distance < 10.0)
             distance = 10.0;
         
+        // 根据距离生成颜色（近为绿色，远为红色）
         return [(distance-10)/50.0, 1- (distance-10)/50.0, 0].map(c=>{
             let hex = Math.floor(c*255).toString(16);
             if (hex.length == 1)
@@ -315,6 +343,7 @@ class ImageContext extends MovableView{
 
     }
 
+    // 将点列表转换为折线属性字符串
     to_polyline_attr(points){
         return points.reduce(function(x,y){
             return String(x)+","+y;
@@ -323,6 +352,7 @@ class ImageContext extends MovableView{
     }
 
     
+    // 转换为视图框坐标
     to_viewbox_coord(x,y){
         var div = this.ui.querySelector("#maincanvas-svg");
         
@@ -332,6 +362,7 @@ class ImageContext extends MovableView{
 
     }
 
+    // 处理点击事件
     on_click(e){
         var p= this.to_viewbox_coord(e.layerX, e.layerY);
         var x=p[0];
@@ -343,6 +374,7 @@ class ImageContext extends MovableView{
         if (!this.drawing){
 
             if (e.ctrlKey){
+                // 开始绘制模式
                 this.drawing = true;
                 var svg = this.ui.querySelector("#maincanvas-svg");
                 //svg.style.position = "absolute";
@@ -363,13 +395,14 @@ class ImageContext extends MovableView{
             
             }
             else{
-                // not drawing
+                // 非绘制模式
                 //this is a test
                 if (false){
                     let nearest_x = 100000;
                     let nearest_y = 100000;
                     let selected_pts = [];
                     
+                    // 查找最近的点
                     for (let i =x-100; i<x+100; i++){
                         if (i < 0 || i >= this.img.width)
                             continue;
@@ -381,7 +414,7 @@ class ImageContext extends MovableView{
                             let lidarpoint = this.img_lidar_point_map[j*this.img.width+i];
                             if (lidarpoint){
                                 //console.log(i,j, lidarpoint);
-                                selected_pts.push(lidarpoint); //index of lidar point
+                                selected_pts.push(lidarpoint); //激光雷达点的索引
 
                                 if (((i-x) * (i-x) + (j-y)*(j-y)) < ((nearest_x-x)*(nearest_x-x) + (nearest_y-y)*(nearest_y-y))){
                                     nearest_x = i;
@@ -467,13 +500,20 @@ class ImageContext extends MovableView{
     
 
 
+    /**
+     * 获取相机标定参数
+     * @returns {Object|null} 相机标定参数对象或null（如果不存在）
+     */
     getCalib(){
+        // 获取场景元数据
         var scene_meta = this.world.sceneMeta;
            
+        // 检查是否存在相机标定数据
         if (!scene_meta.calib.camera){
             return null;
         }
 
+        // 获取当前相机的标定参数
         //var active_camera_name = this.world.cameras.active_name;
         var calib = scene_meta.calib.camera[this.name];
 
@@ -483,18 +523,26 @@ class ImageContext extends MovableView{
 
 
 
+    /**
+     * 获取坐标变换比例
+     * @returns {Object|null} 变换比例对象或null（如果没有图像）
+     */
     get_trans_ratio(){
+        // 获取相机图像
         var img = this.world.cameras.getImageByName(this.name);       
 
+        // 如果没有图像或图像宽度为0，返回null
         if (!img || img.width==0){
             return null;
         }
 
         var clientWidth, clientHeight;
 
+        // 设置客户端宽高
         clientWidth = 2048;
         clientHeight = 1536;
 
+        // 计算变换比例
         var trans_ratio ={
             x: clientWidth/img.naturalWidth,
             y: clientHeight/img.naturalHeight,
@@ -503,10 +551,13 @@ class ImageContext extends MovableView{
         return trans_ratio;
     }
 
+    /**
+     * 显示图像
+     */
     show_image(){
         var svgimage = this.ui.querySelector("#svg-image");
 
-        // active img is set by global, it's not set sometimes.
+        // 获取相机图像（全局设置，有时可能未设置）
         var img = this.world.cameras.getImageByName(this.name);
         if (img){
             svgimage.setAttribute("xlink:href", img.src);
@@ -518,7 +569,16 @@ class ImageContext extends MovableView{
     }
 
 
+    /**
+     * 将点转换为SVG格式
+     * @param {Array} points - 点坐标数组
+     * @param {Object} trans_ratio - 坐标变换比例
+     * @param {string} cssclass - CSS类名
+     * @param {number} radius - 点的半径，默认为2
+     * @returns {Element} SVG元素
+     */
     points_to_svg(points, trans_ratio, cssclass, radius=2){
+        // 根据变换比例调整点坐标
         var ptsFinal = points.map(function(x, i){
             if (i%2==0){
                 return Math.round(x * trans_ratio.x);
@@ -527,13 +587,16 @@ class ImageContext extends MovableView{
             }
         });
 
+        // 创建SVG组元素
         var svg = document.createElementNS("http://www.w3.org/2000/svg", 'g');
         
+        // 设置CSS类
         if (cssclass)
         {
             svg.setAttribute("class", cssclass);
         }
         
+        // 为每个点创建圆形元素
         for (let i = 0; i < ptsFinal.length; i+=2){
 
             
@@ -546,11 +609,12 @@ class ImageContext extends MovableView{
             p.setAttribute("r", 2);
             p.setAttribute("stroke-width", "1");            
 
+            // 如果没有指定CSS类，则根据距离设置颜色
             if (! cssclass){
                 let image_x = points[i];
                 let image_y = points[i+1];
                 let color = point_color_by_distance(image_x, image_y);
-                color += "24"; //transparency
+                color += "24"; // 透明度
                 p.setAttribute("stroke", color);
                 p.setAttribute("fill", color);
             }
@@ -561,6 +625,11 @@ class ImageContext extends MovableView{
         return svg;
     }
 
+    /**
+     * 绘制点
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     */
     draw_point(x,y){
         let trans_ratio = this.get_trans_ratio();
         let svg = this.ui.querySelector("#svg-points");
@@ -571,41 +640,61 @@ class ImageContext extends MovableView{
 
 
 
+    /**
+     * 渲染2D图像
+     */
     render_2d_image (){
 
         
+        // 如果禁用了主图像上下文，则返回
         if (this.cfg.disableMainImageContext)
             return;
+        // 清空画布
         this.clear_main_canvas();
 
+        // 显示图像
         this.show_image();
+        // 绘制SVG元素
         this.draw_svg();
     }
 
 
+    /**
+     * 隐藏画布
+     */
     hide_canvas(){
         //document.getElementsByClassName("ui-wrapper")[0].style.display="none";
         this.ui.style.display="none";
     }
 
+    /**
+     * 显示画布
+     */
     show_canvas(){
         this.ui.style.display="inline";
     }
 
 
+    /**
+     * 绘制SVG元素
+     */
     draw_svg(){
-        // draw picture
+        // 绘制图像
         var img = this.world.cameras.getImageByName(this.name);
 
+        // 如果没有图像或图像宽度为0，隐藏画布并返回
         if (!img || img.width==0){
             this.hide_canvas();
             return;
         }
 
+        // 显示画布
         this.show_canvas();
 
+        // 获取坐标变换比例
         var trans_ratio = this.get_trans_ratio();
 
+        // 获取相机标定参数
         var calib = this.getCalib();
         if (!calib){
             return;
@@ -613,10 +702,12 @@ class ImageContext extends MovableView{
 
         let svg = this.ui.querySelector("#svg-boxes");
 
-        // draw boxes
+        // 绘制3D框
         this.world.annotation.boxes.forEach((box)=>{
+            // 将3D框投影到2D图像上
             var imgfinal = box_to_2d_points(box, calib);
             if (imgfinal){
+                // 转换为SVG元素
                 var box_svg = this.box_to_svg (box, imgfinal, trans_ratio, this.get_selected_box() == box);
                 svg.appendChild(box_svg);
             }
@@ -625,15 +716,18 @@ class ImageContext extends MovableView{
 
         svg = this.ui.querySelector("#svg-points");
 
-        // draw radar points
+        // 绘制雷达点
         if (this.cfg.projectRadarToImage)
         {
             this.world.radars.radarList.forEach(radar=>{
+                // 获取未偏移的雷达点
                 let pts = radar.get_unoffset_radar_points();
+                // 将3D点投影到2D图像上
                 let ptsOnImg = points3d_to_image2d(pts, calib);
 
-                // there may be none after projecting
+                // 投影后可能没有点
                 if (ptsOnImg && ptsOnImg.length>0){
+                    // 转换为SVG元素
                     let pts_svg = this.points_to_svg(ptsOnImg, trans_ratio, radar.cssStyleSelector);
                     svg.appendChild(pts_svg);
                 }
@@ -642,13 +736,16 @@ class ImageContext extends MovableView{
 
 
 
-        // project lidar points onto camera image   
+        // 将激光雷达点投影到相机图像上   
         if (this.cfg.projectLidarToImage){
+            // 获取所有激光雷达点
             let pts = this.world.lidar.get_all_points();
+            // 将3D点投影到2D图像上
             let ptsOnImg = points3d_to_image2d(pts, calib, true, this.img_lidar_point_map, img.width, img.height);
 
-            // there may be none after projecting
+            // 投影后可能没有点
             if (ptsOnImg && ptsOnImg.length>0){
+                // 转换为SVG元素
                 let pts_svg = this.points_to_svg(ptsOnImg, trans_ratio);
                 svg.appendChild(pts_svg);
             }
@@ -656,9 +753,17 @@ class ImageContext extends MovableView{
 
     }
 
+    /**
+     * 将3D框转换为SVG元素
+     * @param {Object} box - 3D框对象
+     * @param {Array} box_corners - 框角点坐标
+     * @param {Object} trans_ratio - 坐标变换比例
+     * @param {boolean} selected - 是否选中
+     * @returns {Element} SVG元素
+     */
     box_to_svg(box, box_corners, trans_ratio, selected){
         
-
+        // 根据变换比例调整角点坐标
         var imgfinal = box_corners.map(function(x, i){
             if (i%2==0){
                 return Math.round(x * trans_ratio.x);
@@ -667,10 +772,11 @@ class ImageContext extends MovableView{
             }
         })
 
-
+        // 创建SVG组元素
         var svg = document.createElementNS("http://www.w3.org/2000/svg", 'g');
         svg.setAttribute("id", "svg-box-local-"+box.obj_local_id);
 
+        // 设置CSS类
         if (selected){
             svg.setAttribute("class", box.obj_type+" box-svg box-svg-selected");
         } else{
@@ -678,13 +784,14 @@ class ImageContext extends MovableView{
             {
                 svg.setAttribute("class", "color-"+box.obj_track_id%33);
             }
-            else // by id
+            else // 按类别着色
             {
                 svg.setAttribute("class", box.obj_type + " box-svg");
             }
         }
 
                 
+        // 创建前面板多边形
         var front_panel =  document.createElementNS("http://www.w3.org/2000/svg", 'polygon');
         svg.appendChild(front_panel);
         front_panel.setAttribute("points",
@@ -703,6 +810,7 @@ class ImageContext extends MovableView{
         )
         */
 
+        // 绘制后面板的边
         for (var i = 0; i<4; ++i){
             var line =  document.createElementNS("http://www.w3.org/2000/svg", 'line');
             svg.appendChild(line);
@@ -713,6 +821,7 @@ class ImageContext extends MovableView{
         }
 
 
+        // 绘制连接线（前面板到后面板）
         for (var i = 0; i<4; ++i){
             var line =  document.createElementNS("http://www.w3.org/2000/svg", 'line');
             svg.appendChild(line);
@@ -726,12 +835,15 @@ class ImageContext extends MovableView{
     }
 
 
+    // 盒子管理器
     boxes_manager = {
+        // 显示图像
         display_image: ()=>{
             if (!this.cfg.disableMainImageContext)
                 this.render_2d_image();
         },
 
+        // 添加盒子
         add_box: (box)=>{
             var calib = this.getCalib();
             if (!calib){
@@ -757,6 +869,7 @@ class ImageContext extends MovableView{
         },
 
 
+        // 当盒子被选中时
         onBoxSelected: (box_obj_local_id, obj_type)=>{
             var b = this.ui.querySelector("#svg-box-local-"+box_obj_local_id);
             if (b){
@@ -765,6 +878,7 @@ class ImageContext extends MovableView{
         },
 
 
+        // 当盒子取消选中时
         onBoxUnselected: (box_obj_local_id, obj_type)=>{
             var b = this.ui.querySelector("#svg-box-local-"+box_obj_local_id);
 
@@ -1072,53 +1186,77 @@ class ImageContextManager {
 
 }
 
+/**
+ * 将3D框转换为2D图像上的点
+ * @param {Object} box - 3D框对象
+ * @param {Object} calib - 相机标定参数
+ * @returns {Array} 2D点坐标数组
+ */
 function box_to_2d_points(box, calib){
     var scale = box.scale;
     var pos = box.position;
     var rotation = box.rotation;
 
+    // 将位置、尺寸和旋转转换为3D坐标
     var box3d = psr_to_xyz(pos, scale, rotation);
 
     //console.log(box.obj_track_id, box3d.slice(8*4));
 
     box3d = box3d.slice(0,8*4);
+    // 将3D点投影到2D图像上
     return points3d_homo_to_image2d(box3d, calib);
 }   
 
-// points3d is length 4 row vector, homogeneous coordinates
-// returns 2d row vectors
+/**
+ * 将齐次坐标系的3D点投影到2D图像上
+ * @param {Array} points3d - 3D点坐标（齐次坐标，长度为4的行向量）
+ * @param {Object} calib - 相机标定参数
+ * @param {boolean} accept_partial - 是否接受部分点（默认为false）
+ * @param {Object} save_map - 保存映射关系的对象
+ * @param {number} img_dx - 图像宽度
+ * @param {number} img_dy - 图像高度
+ * @returns {Array} 2D点坐标数组
+ */
 function points3d_homo_to_image2d(points3d, calib, accept_partial=false,save_map, img_dx, img_dy){
+    // 使用外参矩阵将点从世界坐标系变换到相机坐标系
     var imgpos = matmul(calib.extrinsic, points3d, 4);
     
-    //rect matrix shall be applied here, for kitti
+    // 对于KITTI数据集，需要应用rect矩阵
     if (calib.rect){
         imgpos = matmul(calib.rect, imgpos, 4);
     }
 
+    // 将4维向量转换为3维向量
     var imgpos3 = vector4to3(imgpos);
 
     var imgpos2;
+    // 根据内参矩阵的长度选择不同的处理方式
     if (calib.intrinsic.length>9) {
         imgpos2 = matmul(calib.intrinsic, imgpos, 4);
     }
     else
         imgpos2 = matmul(calib.intrinsic, imgpos3, 3);
 
+    // 归一化坐标
     let imgfinal = vector3_nomalize(imgpos2);
     let imgfinal_filterd = [];
      
+    // 如果接受部分点
     if (accept_partial){
         let temppos=[];
         let p = imgpos3;
         for (var i = 0; i<p.length/3; i++){
+            // 只处理Z坐标大于0的点（在相机前方）
             if (p[i*3+2]>0){
                 let x = imgfinal[i*2];
                 let y = imgfinal[i*2+1];
                 
                 x = Math.round(x);
                 y = Math.round(y);
+                // 检查点是否在图像范围内
                 if (x > 0 && x < img_dx && y > 0 && y < img_dy){
                     if (save_map){
+                        // 保存点的映射关系
                         save_map[img_dx*y+x] = [i, points3d[i*4+0], points3d[i*4+1], points3d[i*4+2]];  //save index? a little dangerous! //[points3d[i*4+0], points3d[i*4+1], points3d[i*4+2]];
                     }
 
@@ -1138,6 +1276,7 @@ function points3d_homo_to_image2d(points3d, calib, accept_partial=false,save_map
         //todo: this function need clearance
         //imgpos2 = matmul(calib.intrinsic, temppos, 3);
     }
+    // 如果不接受部分点且有点不在图像范围内，返回null
     else  if (!accept_partial && !all_points_in_image_range(imgpos3)){
             return null;
     }
@@ -1145,6 +1284,11 @@ function points3d_homo_to_image2d(points3d, calib, accept_partial=false,save_map
     return imgfinal;
 }
 
+/**
+ * 将3D点转换为齐次坐标
+ * @param {Array} points - 3D点坐标
+ * @returns {Array} 齐次坐标
+ */
 function point3d_to_homo(points){
     let homo=[];
     for (let i =0; i<points.length; i+=3){
@@ -1156,11 +1300,27 @@ function point3d_to_homo(points){
 
     return homo;
 }
+
+/**
+ * 将3D点投影到2D图像上
+ * @param {Array} points - 3D点坐标
+ * @param {Object} calib - 相机标定参数
+ * @param {boolean} accept_partial - 是否接受部分点（默认为false）
+ * @param {Object} save_map - 保存映射关系的对象
+ * @param {number} img_dx - 图像宽度
+ * @param {number} img_dy - 图像高度
+ * @returns {Array} 2D点坐标数组
+ */
 function points3d_to_image2d(points, calib, accept_partial=false, save_map, img_dx, img_dy){
     // 
     return points3d_homo_to_image2d(point3d_to_homo(points), calib, accept_partial, save_map, img_dx, img_dy);
 }
 
+/**
+ * 检查所有点是否都在图像范围内（Z坐标大于0）
+ * @param {Array} p - 3D点坐标
+ * @returns {boolean} 是否所有点都在图像范围内
+ */
 function all_points_in_image_range(p){
     for (var i = 0; i<p.length/3; i++){
         if (p[i*3+2]<0){
@@ -1172,32 +1332,44 @@ function all_points_in_image_range(p){
 }
 
 
+/**
+ * 为点选择最佳相机
+ * @param {Object} scene_meta - 场景元数据
+ * @param {Object} center - 中心点坐标
+ * @returns {string|null} 最佳相机名称或null
+ */
 function  choose_best_camera_for_point(scene_meta, center){
         
+    // 检查是否存在标定数据
     if (!scene_meta.calib){
         return null;
     }
 
     var proj_pos = [];
+    // 遍历所有相机，计算点在各相机坐标系中的位置
     for (var i in scene_meta.calib.camera){
         var imgpos = matmul(scene_meta.calib.camera[i].extrinsic, [center.x,center.y,center.z,1], 4);
         proj_pos.push({calib: i, pos: vector4to3(imgpos)});
     }
 
+    // 过滤出在图像范围内的投影点
     var valid_proj_pos = proj_pos.filter(function(p){
         return all_points_in_image_range(p.pos);
     });
     
+    // 计算各点到图像中心的距离
     valid_proj_pos.forEach(function(p){
         p.dist_to_center = p.pos[0]*p.pos[0] + p.pos[1]*p.pos[1];
     });
 
+    // 按距离排序
     valid_proj_pos.sort(function(x,y){
         return x.dist_to_center - y.dist_to_center;
     });
 
     //console.log(valid_proj_pos);
 
+    // 返回距离最近的相机
     if (valid_proj_pos.length>0){
         return valid_proj_pos[0].calib;
     }

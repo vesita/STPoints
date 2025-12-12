@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 	<head>
-		<title>SUSTech POINTS</title>
+		<title>STPoints 点云标注工具</title>
 		<meta charset="utf-8">
 		<link rel="icon" type="image/png" href="/static/icon2.png">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
@@ -24,21 +24,21 @@
 						<!-- text id="frame"></text-->
 						<div id="selectors">
 							<select id="scene-selector">
-								<option>--scene--</option>
+								<option>--场景--</option>
 							</select>
-							<div id='btn-reload-scene-list' class="ui-button" title="reload scene list">
+							<div id='btn-reload-scene-list' class="ui-button" title="重新加载场景列表">
 								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 									<path d="M 12 20 A 8 8 0 1 1 20 12  M 21 9 L 20 12 L 18 10" />
 								</g></svg>
 							</div>
 							<select id="frame-selector">
-									<option>--frame--</option>
+									<option>--帧--</option>
 							</select>
 							<!-- <select id="camera-selector">
 									<option>--camera--</option>
 							</select> -->
 							<div id="camera-selector">
-								<span>Camera</span>
+								<span>相机</span>
 								<div id="camera-list">									
 								</div>
 							</div>
@@ -46,7 +46,7 @@
 						</div>
 
 						<select id="object-selector">
-							<option>--object--</option>
+							<option>--对象--</option>
 						</select>
 
 						
@@ -67,7 +67,7 @@
 									</g></svg>
 								</div>
 								<div id="changed-world-list-wrapper">
-									<div> All modified frames, click to save them all</div>
+									<div> 所有修改的帧，点击全部保存</div>
 									<div id='changed-world-list'></div>
 								</div>
 							</div>
@@ -109,7 +109,7 @@
 						<div id="obj-editor">
 							
 							<div class="obj-editor-row">
-								<div id="label-copy" class="ui-button" title="copy (C-c)">
+								<div id="label-copy" class="ui-button" title="复制 (C-c)">
 									<!-- <span class="ui-icon ui-icon-copy"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<!-- <rect x="4" y="4" width="12" height="12"/> -->
@@ -117,7 +117,7 @@
 										<polyline points="8 16 4 16 4 4 16 4 16 8 "/>
 									</g></svg>
 								</div>
-								<div id="label-paste" class="ui-button"  title="auto adjust">
+								<div id="label-paste" class="ui-button"  title="自动调整">
 									<!-- <span class="ui-icon ui-icon-key"></span></div> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<!-- <rect x="4" y="8" width="16" height="12"/>
@@ -131,7 +131,7 @@
 										<polyline points='18 5 15 8' />
 									</g></svg>
 								</div>
-								<div id="label-batchedit" class="ui-button"  title="edit multiple instances">
+								<div id="label-batchedit" class="ui-button"  title="编辑多个实例">
 									<!-- <span class="ui-icon ui-icon-zoomin"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<rect x="4" y="4" width="8" height="8"/>
@@ -141,7 +141,7 @@
 									</g></svg>
 								</div>
 
-								<div id="label-trajectory" class="ui-button"  title="trajectory">
+								<div id="label-trajectory" class="ui-button"  title="轨迹">
 									<!-- <span class="ui-icon ui-icon-zoomin"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<path d="M 4 4 C 20 4, 4 20, 20 20" />
@@ -149,7 +149,7 @@
 									</g></svg>
 								</div>
 
-								<div id="label-highlight" class="ui-button"  title="focus">
+								<div id="label-highlight" class="ui-button"  title="聚焦">
 									<!-- <span class="ui-icon ui-icon-zoomin"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<circle cx="10" cy="10" r="7"/>
@@ -158,7 +158,7 @@
 										<polyline points="6 10 14 10"/>
 									</g></svg>
 								</div>
-								<div id="label-edit" class="ui-button"  title="edit">
+								<div id="label-edit" class="ui-button"  title="编辑">
 									<!-- <span class="ui-icon ui-icon-pencil"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<polyline points="12 4 12 20" />
@@ -168,7 +168,7 @@
 										<!-- <polyline points="16 19 12 15  16 11" /> -->
 									</svg>
 								</div>
-								<div id="label-rotate" class="ui-button"  title="reverse direction (g)">
+								<div id="label-rotate" class="ui-button"  title="反向 (g)">
 									<!-- <span class="ui-icon ui-icon-transferthick-e-w"></span></div> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<!-- <rect x=6 y=4 width=12 height=8 />
@@ -184,7 +184,7 @@
 									</g></svg>
 								</div>
 								
-								<div id="label-del" class="ui-button"  title="delete (Del)">
+								<div id="label-del" class="ui-button"  title="删除 (Del)">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V8H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path>
@@ -204,69 +204,68 @@
 									<div id="object-dropdown-menu" class="non-selectable">
 										<div class="menu-item" id="cm-delete-obj">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Delete this object (in all frames)</div>
+											<div class="menu-item-text">删除此对象 (所有帧)</div>
 										</div>
 										<div class="menu-item" id="cm-modify-obj-type">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Sync object type & attr</div>
+											<div class="menu-item-text">同步对象类型和属性</div>
 										</div>
 										<div class="menu-item" id="cm-modify-obj-size">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Sync object size</div>
+											<div class="menu-item-text">同步对象大小</div>
 										</div>
 				
 										<div class="menu-item menu-seperator"></div>
 										<div class="menu-item" id="cm-auto-ann-background">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Auto ann. it in background</div>
+											<div class="menu-item-text">后台自动标注</div>
 										</div>
 										<div class="menu-item" id="cm-interpolate-background">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">interpolate it in background</div>
+											<div class="menu-item-text">后台插值</div>
 										</div>			
 			
 										<div class="menu-item menu-seperator"></div>
 										<div class="menu-item" id="cm-select-as-ref">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Copy/Select as Ref</div>
+											<div class="menu-item-text">复制/选择为参考</div>
 										</div>
 										<div class="menu-item menu-seperator"></div>
 										<div class="menu-item" id="cm-change-id-to-ref">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Change ID to Ref</div>
+											<div class="menu-item-text">将ID更改为参考</div>
 										</div>
 										<div class="menu-item" id="cm-change-id-to-ref-in-scene">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Change ID to Ref in all frames</div>
+											<div class="menu-item-text">将所有帧中的ID更改为参考</div>
 										</div>
 										<div class="menu-item menu-seperator"></div>
 										<div class="menu-item" id="cm-follow-ref">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Follow Ref</div>
+											<div class="menu-item-text">跟随参考</div>
 										</div>
 				
 										<div class="menu-item" id="cm-sync-followers">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Sync followers</div>
+											<div class="menu-item-text">同步跟随者</div>
 										</div>
 										
 				
 										<div class="menu-item" id="cm-follow-static-objects">
 											<div class="menu-item-icon"></div>
-											<div class="menu-item-text">Follow Static Objects</div>
+											<div class="menu-item-text">跟随静态对象</div>
 										</div>
-				
 									</div>
 								</div>
 							</div>
 
 						
-							<div class="obj-editor-row">
-								<select title="category"  id="object-category-selector"></select>
+							<div class = "obj-editor-row">
+								<select title="类别"  id="object-category-selector"></select>
 
-								<input title="tracking id" list="obj-ids-of-scene" id="object-track-id-editor" type="text" size="5" placeholder="track id"></input>
+								<input title="跟踪ID" list="obj-ids-of-scene" id="object-track-id-editor" type="text" size="5" placeholder="跟踪ID"></input>
 								<datalist id="obj-ids-of-scene"></datalist>														
-								<div id="label-gen-id" class="ui-button" title="generate ID">
+								<div id="label-gen-id" class="ui-button" title="生成ID">
 									<!-- <span class="ui-icon ui-icon-copy"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<!-- <rect x="4" y="4" width="12" height="12"/> -->
@@ -277,7 +276,7 @@
 
 							<div class = "obj-editor-row">
 								<div id="attr-editor">
-									<input title="attribute" id="attr-input" type="text" size="10" placeholder="attribute">
+									<input title="属性" id="attr-input" type="text" size="10" placeholder="属性">
 									<div id="attr-selector">									
 									</div>
 								</div>
@@ -304,7 +303,7 @@
 
 						<div class="menu-item" id="cm-new">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">New</div>							
+							<div class="menu-item-text">新建</div>							
 							<div class="menu-item-arrow menu-item-icon">
 								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-menu-icon"><g>
 									<path d="M12 8 L 18 12 L 12 16Z"></path>
@@ -314,16 +313,16 @@
 							</div>
 						</div>
 
-						<div class="menu-item" id="cm-paste" title="hold shift key to disable auto-adjust">
+						<div class="menu-item" id="cm-paste" title="按住Shift键禁用自动调整">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Paste</div>
+							<div class="menu-item-text">粘贴</div>
 						</div>
 
 						<div class="menu-item menu-seperator"></div>
 
 						<div class="menu-item" id="cm-goto">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Go to</div>
+							<div class="menu-item-text">转到</div>
 							<div class="menu-item-arrow menu-item-icon">
 								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-menu-icon"><g>
 									<path d="M12 8 L 18 12 L 12 16Z"></path>
@@ -332,57 +331,57 @@
 							<div id="goto-submenu">
 								<div class="menu-item" id="cm-prev-frame">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">Previous frame (3)</div>
+									<div class="menu-item-text">上一帧 (3)</div>
 								</div>
 							
 								<div class="menu-item" id="cm-next-frame">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">Next frame (4)</div>
+									<div class="menu-item-text">下一帧 (4)</div>
 								</div>
 		
 								<div class="menu-item" id="cm-first-frame">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">First frame</div>
+									<div class="menu-item-text">第一帧</div>
 								</div>
 								<div class="menu-item" id="cm-last-frame">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">Last frame</div>
+									<div class="menu-item-text">最后一帧</div>
 								</div>
 
 
 								<div class="menu-item menu-seperator"></div>
 								<div class="menu-item" id="cm-prev-object">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">Previous object (1)</div>
+									<div class="menu-item-text">上一个对象 (1)</div>
 								</div>
 							
 								<div class="menu-item" id="cm-next-object">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">Next object (2)</div>
+									<div class="menu-item-text">下一个对象 (2)</div>
 								</div>
 
 
 								<div class="menu-item menu-seperator"></div>
 								<div class="menu-item" id="cm-go-to-10hz">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">Full 10hz scene</div>
+									<div class="menu-item-text">完整10Hz场景</div>
 								</div>
 								
 								<div class="menu-item" id="cm-go-to-full-2hz">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">Full 2Hz scene</div>
+									<div class="menu-item-text">完整2Hz场景</div>
 								</div>
 
 								<div class="menu-item" id="cm-go-to-2hz">
 									<div class="menu-item-icon"></div>
-									<div class="menu-item-text">2Hz scene</div>
+									<div class="menu-item-text">2Hz场景</div>
 								</div>
 							</div>
 						</div>
 						
 						<div class="menu-item" id="cm-play">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Play</div>
+							<div class="menu-item-text">播放</div>
 							<div class="menu-item-arrow menu-item-icon">
 								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-menu-icon"><g>
 									<path d="M12 8 L 18 12 L 12 16Z"></path>
@@ -402,12 +401,12 @@
 					
 						<div class="menu-item" id="cm-pause">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Pause/Resume (Space)</div>				
+							<div class="menu-item-text">暂停/继续 (空格)</div>				
 						</div>
 
 						<div class="menu-item" id="cm-stop">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Stop</div>				
+							<div class="menu-item-text">停止</div>				
 						</div>
 
 						<div class="menu-item menu-seperator"></div>
@@ -415,7 +414,7 @@
 						
 						<div class="menu-item" id="cm-save">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Save (C-s)</div>				
+							<div class="menu-item-text">保存 (C-s)</div>				
 						</div>
 						
 						<!-- <div class="menu-item" id="cm-save-all">
@@ -426,36 +425,36 @@
 
 						<div class="menu-item" id="cm-reload">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Reload (C-r)</div>				
+							<div class="menu-item-text">重新加载 (C-r)</div>				
 						</div>
 
 						<div class="menu-item" id="cm-reload-all">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Reload All</div>				
+							<div class="menu-item-text">重新加载所有</div>				
 						</div>
 
 						<div class="menu-item menu-seperator"></div>
 						
 						<div class="menu-item" id="cm-reset-view">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Reset view</div>				
+							<div class="menu-item-text">重置视图</div>				
 						</div>
 
 						<div class="menu-item menu-seperator"></div>
 						<div class="menu-item" id="cm-show-frame-info">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Frame info</div>				
+							<div class="menu-item-text">帧信息</div>				
 						</div>
 
 						<div class="menu-item menu-seperator"></div>
 						<div class="menu-item" id="cm-show-stat">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Stat</div>				
+							<div class="menu-item-text">统计</div>				
 						</div>
 
 						<div class="menu-item" id="cm-check-scene">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Check</div>				
+							<div class="menu-item-text">检查</div>				
 						</div>
 
 					</div>
@@ -464,61 +463,61 @@
 						<div class="menu-item" id="cm-delete">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text">Delete</div>
+							<div class="menu-item-text">删除</div>
 						</div>
 
 						<div class="menu-item" id="cm-delete-obj">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Delete this object (in all frames)</div>
+							<div class="menu-item-text">删除此对象 (所有帧)</div>
 						</div>
 						<div class="menu-item" id="cm-modify-obj-type">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Sync object type & attr</div>
+							<div class="menu-item-text">同步对象类型和属性</div>
 						</div>
 						<div class="menu-item" id="cm-modify-obj-size">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Sync object size</div>
+							<div class="menu-item-text">同步对象大小</div>
 						</div>
 
 						<div class="menu-item menu-seperator"></div>
 						<div class="menu-item" id="cm-edit-multiple-instances">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Edit multiple instances</div>
+							<div class="menu-item-text">编辑多个实例</div>
 						</div>
 						<div class="menu-item" id="cm-auto-ann-background">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Auto annotate in background</div>
+							<div class="menu-item-text">后台自动标注</div>
 						</div>
 						<div class="menu-item" id="cm-interpolate-background">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Interpolate in background</div>
+							<div class="menu-item-text">后台插值</div>
 						</div>
 
 						<div class="menu-item" id="cm-show-trajectory">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Show Trajectory</div>
+							<div class="menu-item-text">显示轨迹</div>
 						</div>
 
 						<div class="menu-item menu-seperator"></div>
 						<div class="menu-item" id="cm-select-as-ref">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Copy/Select as Ref</div>
+							<div class="menu-item-text">复制/选择为参考</div>
 						</div>
 						
 						<div class="menu-item" id="cm-follow-ref">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Follow Ref</div>
+							<div class="menu-item-text">跟随参考</div>
 						</div>
 
 						<div class="menu-item" id="cm-sync-followers">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Sync followers</div>
+							<div class="menu-item-text">同步跟随者</div>
 						</div>
 						
 
 						<div class="menu-item" id="cm-follow-static-objects">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Follow Static Objects</div>
+							<div class="menu-item-text">跟随静态对象</div>
 						</div>
 
 					</div>
@@ -528,19 +527,19 @@
 						<div class="menu-item" id="cm-select-all">
 							<div class="menu-item-icon">
 							</div>
-							<div class="menu-item-text"><u>S</u>elect all</div>
+							<div class="menu-item-text"><u>全</u>选</div>
 						</div>
 
 						<div class="menu-item" id="cm-select-all-previous">
 							<div class="menu-item-icon">
 							</div>
-							<div class="menu-item-text">Select all previous</div>
+							<div class="menu-item-text">选择所有之前的</div>
 						</div>
 
 						<div class="menu-item" id="cm-select-all-next">
 							<div class="menu-item-icon">
 							</div>
-							<div class="menu-item-text">Select all next</div>
+							<div class="menu-item-text">选择所有之后的</div>
 						</div>
 
 						
@@ -549,7 +548,7 @@
 						<div class="menu-item" id="cm-delete-empty-boxes">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text">Delete empty boxes</div>
+							<div class="menu-item-text">删除空框</div>
 						</div>
 
 
@@ -559,37 +558,37 @@
 						<div class="menu-item" id="cm-delete">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text"><u>D</u>elete</div>
+							<div class="menu-item-text"><u>删</u>除</div>
 						</div>
 
 						<div class="menu-item" id="cm-delete-intersected-boxes">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text">Delete intersected boxes</div>
+							<div class="menu-item-text">删除相交框</div>
 						</div>
 						
 						<div class="menu-item" id="cm-interpolate">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text">Int<u>e</u>rpolate</div>
+							<div class="menu-item-text">插<u>值</u></div>
 						</div>
 
 						<div class="menu-item" id="cm-auto-annotate">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text"><u>A</u>uto annotate</div>
+							<div class="menu-item-text"><u>自</u>动标注</div>
 						</div>
 
 						<div class="menu-item" id="cm-auto-annotate-wo-rotation">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text">Auto  annotate (no rotation)</div>
+							<div class="menu-item-text">自动标注 (无旋转)</div>
 						</div>
 
 
 						<div class="menu-item" id="cm-fit">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Fit</div>
+							<div class="menu-item-text">适配</div>
 							<div class="menu-item-arrow menu-item-icon">
 								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-menu-icon"><g>
 									<path d="M12 8 L 18 12 L 12 16Z"></path>
@@ -597,65 +596,65 @@
 							</div>
 							<div id="cm-fit-submenu">
 								<div class="menu-item" id="cm-fit-size">
-									<div class="menu-item-text">Size</div></div>
+									<div class="menu-item-text">大小</div></div>
 								<div class="menu-item" id="cm-fit-position">
-									<div class="menu-item-text">Position</div></div>
+									<div class="menu-item-text">位置</div></div>
 								<div class="menu-item" id="cm-fit-rotation">
-									<div class="menu-item-text">Rotation</div></div>
+									<div class="menu-item-text">旋转</div></div>
 								<div class="menu-item" id="cm-fit-moving-direction">
-									<div class="menu-item-text">Moving direction</div></div>
+									<div class="menu-item-text">移动方向</div></div>
 								<div class="menu-item menu-seperator"></div>
 								<div class="menu-item" id="cm-fit-top">
-									<div class="menu-item-text">Top</div></div>	
+									<div class="menu-item-text">顶部</div></div>	
 								<div class="menu-item" id="cm-fit-bottom">
-									<div class="menu-item-text">Bottom</div></div>
+									<div class="menu-item-text">底部</div></div>
 								<div class="menu-item" id="cm-fit-left">
-									<div class="menu-item-text">Left</div></div>
+									<div class="menu-item-text">左侧</div></div>
 								<div class="menu-item" id="cm-fit-right">
-									<div class="menu-item-text">Right</div></div>
+									<div class="menu-item-text">右侧</div></div>
 								<div class="menu-item" id="cm-fit-front">
-									<div class="menu-item-text">Front</div></div>
+									<div class="menu-item-text">前部</div></div>
 								<div class="menu-item" id="cm-fit-rear">
-									<div class="menu-item-text">Rear</div></div>
+									<div class="menu-item-text">后部</div></div>
 							</div>
 						</div>
 
 						<div class="menu-item" id="cm-reverse-direction">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Reverse heading direction</div>
+							<div class="menu-item-text">反向</div>
 						</div>
 
 						<div class="menu-item" id="cm-reset-roll-pitch">
 							<div class="menu-item-icon"></div>
-							<div class="menu-item-text">Reset roll & pitch</div>
+							<div class="menu-item-text">重置滚动和俯仰</div>
 						</div>
 
 						<div class="menu-item" id="cm-finalize">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text"><u>F</u>inalize</div>
+							<div class="menu-item-text"><u>完</u>成</div>
 						</div>
 
 						<div class="menu-item" id="cm-reload">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text">Reload</div>
+							<div class="menu-item-text">重新加载</div>
 						</div>
 
 
 						<div class="menu-item menu-seperator"></div>
 
 						<div class="menu-item" id="cm-goto-this-frame">
-							<div class="menu-item-text"><u>G</u>o to this frame</div>
+							<div class="menu-item-text"><u>跳</u>转到此帧</div>
 						</div>
 
 
 						<div class="menu-item" id="cm-sync-size">
-							<div class="menu-item-text">Sync size to all</div>
+							<div class="menu-item-text">同步大小到所有</div>
 						</div>
 
 						<div class="menu-item" id="cm-follow-static-objects">
-							<div class="menu-item-text">Follow static objects</div>
+							<div class="menu-item-text">跟随静态对象</div>
 						</div>	
 						
 						
@@ -680,13 +679,13 @@
 						<div class="menu-item" id="cm-show-trajectory">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text"><u>T</u>rajectory</div>
+							<div class="menu-item-text"><u>轨</u>迹</div>
 						</div>
 
 						<div class="menu-item" id="cm-check">
 							<div class="menu-item-icon">							
 							</div>
-							<div class="menu-item-text">Check</div>
+							<div class="menu-item-text">检查</div>
 						</div>
 
 					</div>
@@ -697,13 +696,13 @@
 							<div class="menu-item" id="cm-increase-box-editor">
 								<div class="menu-item-icon">							
 								</div>
-								<div class="menu-item-text">More object instance</div>
+								<div class="menu-item-text">更多对象实例</div>
 							</div>
 
 							<div class="menu-item" id="cm-decrease-box-editor">
 								<div class="menu-item-icon">							
 								</div>
-								<div class="menu-item-text">less object instance</div>
+								<div class="menu-item-text">较少对象实例</div>
 							</div>
 
 					</div>
@@ -713,7 +712,7 @@
 						<div id="config-menu" class="non-selectable">
 
 							<div class="menu-nonclickable-item" id="cfg-theme">
-								<span>Theme</span>
+								<span>主题</span>
 								<div class="cfg-widget-group">
 									<select type="checkbox" id="cfg-theme-select" class="cfg-widget">
 										<option value="dark" selected>dark</option>
@@ -722,14 +721,14 @@
 								</div>
 							</div>
 							<div class="menu-nonclickable-item" id="cfg-point-size">
-								<span>Point size</span>
+								<span>点大小</span>
 								<div class='cfg-widget-group'>
 									<div id='cfg-increase-size' class='menu-button'>+</div>
 									<div id='cfg-decrease-size' class='menu-button'>-</div>
 								</div>
 							</div>
 							<div class="menu-nonclickable-item" id="cfg-point-brightness">
-								<span>Point brightness</span>
+								<span>点亮度</span>
 								<div class='cfg-widget-group'>
 									<div id='cfg-increase-brightness' class='menu-button'>+</div>
 									<div id='cfg-decrease-brightness' class='menu-button'>-</div>
@@ -737,7 +736,7 @@
 							</div>
 
 							<div class="menu-nonclickable-item" id="cfg-hide-circle-ruler">
-								<span>Hide circle ruler</span>
+								<span>隐藏圆圈标尺</span>
 								<div class="cfg-widget-group">
 									<input type="checkbox" id="cfg-hide-circle-ruler-checkbox" class="cfg-widget">
 								</div>
@@ -745,50 +744,50 @@
 
 
 							<div class="menu-nonclickable-item" id="cfg-hide-box">
-								<span>Hide box</span>
+								<span>隐藏框</span>
 								<div class="cfg-widget-group">
 									<input type="checkbox" id="cfg-hide-box-checkbox" class="cfg-widget">
 								</div>
 							</div>
 
 							<div class="menu-nonclickable-item" id="cfg-hide-id">
-								<span>Hide Id</span>
+								<span>隐藏ID</span>
 								<div class="cfg-widget-group">
 									<input type="checkbox" id="cfg-hide-id-checkbox" class="cfg-widget">
 								</div>
 							</div>
 
 							<div class="menu-nonclickable-item" id="cfg-hide-category">
-								<span>Hide Category</span>
+								<span>隐藏类别</span>
 								<div class="cfg-widget-group">
 									<input type="checkbox" id="cfg-hide-category-checkbox" class="cfg-widget">
 								</div>
 							</div>
 							
 							<div class="menu-nonclickable-item" id="cfg-color-points">
-								<span>Color point</span>
+								<span>点着色</span>
 								<div class="cfg-widget-group">
 									<select type="checkbox" id="cfg-color-points-select" class="cfg-widget">
-										<option value="mono" selected>mono</option>
-										<option value="intensity" selected>by intensity</option>									
+										<option value="mono" selected>单色</option>
+										<option value="intensity" selected>按强度</option>									
 									</select>
 								</div>
 							</div>
 
 							<div class="menu-nonclickable-item" id="cfg-color-object">
-								<span>Color objects</span>
+								<span>对象着色</span>
 								<div class="cfg-widget-group">
 									<select id="cfg-color-object-scheme"　 class="cfg-widget">
-										<option value="category">by category</option>
-										<option value="id">by ID</option>
-										<option value="no">don't color</option>
+										<option value="category">按类别</option>
+										<option value="id">按ID</option>
+										<option value="no">不着色</option>
 									</select>
 
 								</div>
 							</div>
 
 							<div class="menu-nonclickable-item" id="cfg-menu-batch-mode-inst-number">
-								<span>Batch mode max box number</span>
+								<span>批处理模式最大框数</span>
 								<div class="cfg-widget-group">								
 									<select title="instance number" id="cfg-batch-mode-inst-number"　 class="cfg-widget">
 										<option value = 10>10</option>
@@ -802,7 +801,7 @@
 
 
 							<div class="menu-nonclickable-item" id="cfg-coordinate-system">
-								<span>Coordinate system</span>
+								<span>坐标系</span>
 								<div class="cfg-widget-group">								
 									<select title="coordinate system" id="cfg-coordinate-system-select"　 class="cfg-widget">
 										<option value = "utm">GPS/UTM</option>
@@ -812,14 +811,14 @@
 							</div>
 
 							<div class="menu-nonclickable-item" id="cfg-auto-rotate-xy">
-								<span>Auto rotate X/Y (roll/pitch)</span>
+								<span>自动旋转X/Y (滚动/俯仰)</span>
 								<div class="cfg-widget-group">
 									<input type="checkbox" id="cfg-auto-rotate-xy-checkbox" class="cfg-widget">
 								</div>
 							</div>
 
 							<div class="menu-nonclickable-item" id="cfg-auto-update-interpolated-boxes">
-								<span>Auto update interploated boxes</span>
+								<span>自动更新插值框</span>
 								<div class="cfg-widget-group">
 									<input type="checkbox" id="cfg-auto-update-interpolated-boxes-checkbox" class="cfg-widget">
 								</div>
@@ -829,7 +828,7 @@
 							<div class="menu-item menu-seperator"></div>
 
 							<div class="menu-item" id="cfg-data">
-								<span>Data settings</span>
+								<span>数据设置</span>
 								<div class="menu-item-arrow menu-item-icon">
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-menu-icon"><g>
 										<path d="M12 8 L 18 12 L 12 16Z"></path>
@@ -839,31 +838,31 @@
 								<div id="cfg-data-submenu">
 
 									<div class="menu-nonclickable-item" id="cfg-data-preload">
-										<div class="menu-item-text">Preload</div>
+										<div class="menu-item-text">预加载</div>
 										<div class="cfg-widget-group">
 											<input type="checkbox" id="cfg-data-preload-checkbox" class="cfg-widget">
 										</div>
 									</div>
 
 									<div class="menu-nonclickable-item" id="cfg-data-aux-lidar">
-										<div class="menu-item-text">Auxiliary LiDAR</div>
+										<div class="menu-item-text">辅助LiDAR</div>
 										<div class="cfg-widget-group">
 											<input type="checkbox" id="cfg-data-aux-lidar-checkbox" class="cfg-widget">
 										</div>
 									</div>
 
 									<div class="menu-nonclickable-item" id="cfg-data-radar">
-										<div class="menu-item-text">Radar</div>
+										<div class="menu-item-text">雷达</div>
 										<div class="cfg-widget-group">
 											<input type="checkbox" id="cfg-data-radar-checkbox" class="cfg-widget">
 										</div>
 									</div>
 
 									<div class="menu-nonclickable-item" id="cfg-data-filter-points">
-										<div class="menu-item-text">Hide points</div>
+										<div class="menu-item-text">隐藏点</div>
 										<div class="cfg-widget-group">
 											<input type="checkbox" id="cfg-data-filter-points-checkbox" class="cfg-widget">
-											<span> z-threshold</span>
+											<span> Z阈值</span>
 											<input id="cfg-data-filter-points-z" class="cfg-widget">
 										</div>
 									</div>
@@ -873,7 +872,7 @@
 
 
 							<div class="menu-item" id="cfg-experimental">
-								<span>Experimental</span>
+								<span>实验性</span>
 								<div class="menu-item-arrow menu-item-icon">
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-menu-icon"><g>
 										<path d="M12 8 L 18 12 L 12 16Z"></path>
@@ -882,33 +881,33 @@
 
 								<div id="cfg-experimental-submenu">
 									<div class="menu-nonclickable-item" id="cfg-calib-camera-LiDAR">
-										<div class="menu-item-text">Camera-LiDAR calibration</div>
+										<div class="menu-item-text">相机-LiDAR标定</div>
 										<div class='cfg-widget-group'>
-											<div id='cfg-start-calib' class='menu-button'>start</div>
-											<div id='cfg-show-calib'  class='menu-button'>result</div>
-											<div id='cfg-stop-calib'  class='menu-button'>stop</div>
+											<div id='cfg-start-calib' class='menu-button'>开始</div>
+											<div id='cfg-show-calib'  class='menu-button'>结果</div>
+											<div id='cfg-stop-calib'  class='menu-button'>停止</div>
 											<!-- <div id='cfg-reset-calib' class='menu-button'>reset</div> -->
 										</div>							
 
 									</div>
 									
 									<div class="menu-item" id="cfg-crop-scene">
-										<div class="menu-item-text">Crop scene</div>				
+										<div class="menu-item-text">裁剪场景</div>				
 									</div>
 								</div>
 							</div>
 
 							<div class="menu-item menu-seperator"></div>
 							<div class="menu-item" id="cfg-show-log">
-								<span>Show logs</span>
+								<span>显示日志</span>
 							</div>
 
 							<div class="menu-item" id="cfg-take-screenshot">
-								<span>Take screenshot</span>
+								<span>截图</span>
 							</div>
 							
 							<div class="menu-item" id="cfg-help">
-								<a href="https://github.com/naurril/SUSTechPOINTS/blob/dev-auto-annotate/README_guide.md" target="_blank">Help</a>
+								<a href="https://github.com/naurril/SUSTechPOINTS/blob/dev-auto-annotate/README_guide.md" target="_blank">帮助</a>
 							</div>
 						</div>					
 					</div>
@@ -926,23 +925,23 @@
 					<div id="view" class="non-selectable">
 						<div id="header">
 							<span id="title">
-								Trajectory								
+								轨迹								
 							</span>
 							
 							<div id="buttons">
-								<div id="btn-restore" class="ui-button"  title="restore">
+								<div id="btn-restore" class="ui-button"  title="恢复">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<rect x = 6 y = 6 width=12 height=12></rect>
 									</g></svg>
 								</div>
-								<div id="btn-maximize" class="ui-button"  title="maximize">
+								<div id="btn-maximize" class="ui-button"  title="最大化">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<rect x = 4 y = 4 width=16 height=16></rect>
 									</g></svg>
 								</div>
-								<div id="btn-exit" class="ui-button"  title="exit">
+								<div id="btn-exit" class="ui-button"  title="退出">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
@@ -961,21 +960,21 @@
 				<div id="info-wrapper" class="popup-window-wrapper" tabindex='-1'>
 					<div id="view">
 						<div id="header">
-							<span id="title">Info</span>
+							<span id="title">信息</span>
 							<div id="buttons">
-								<div id="btn-restore" class="ui-button"  title="restore">
+								<div id="btn-restore" class="ui-button"  title="恢复">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<rect x = 6 y = 6 width=12 height=12></rect>
 									</g></svg>
 								</div>
-								<div id="btn-maximize" class="ui-button"  title="maximize">
+								<div id="btn-maximize" class="ui-button"  title="最大化">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<rect x = 4 y = 4 width=16 height=16></rect>
 									</g></svg>
 								</div>
-								<div id="btn-exit" class="ui-button"  title="exit">
+								<div id="btn-exit" class="ui-button"  title="退出">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
@@ -985,8 +984,8 @@
 						</div>
 						<div id="info-content"></div>
 						<div id="info-bottom-buttons">
-							<button id="btn-no">No</button>
-							<button id="btn-yes">Yes</button>							
+							<button id="btn-no">否</button>
+							<button id="btn-yes">是</button>							
 						</div>
 					</div>
 				</div>
@@ -994,21 +993,21 @@
 				<div id="crop-scene-wrapper" class="popup-window-wrapper" tabindex='-1'>
 					<div id="view">
 						<div id="header">
-							<span id="title">Crop scene</span>
+							<span id="title">裁剪场景</span>
 							<div id="buttons">
-								<div id="btn-restore" class="ui-button"  title="restore">
+								<div id="btn-restore" class="ui-button"  title="恢复">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<rect x = 6 y = 6 width=12 height=12></rect>
 									</g></svg>
 								</div>
-								<div id="btn-maximize" class="ui-button"  title="maximize">
+								<div id="btn-maximize" class="ui-button"  title="最大化">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<rect x = 4 y = 4 width=16 height=16></rect>
 									</g></svg>
 								</div>
-								<div id="btn-exit" class="ui-button"  title="exit">
+								<div id="btn-exit" class="ui-button"  title="退出">
 									<!-- <span class="ui-icon ui-icon-trash"></span> -->
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
@@ -1019,12 +1018,12 @@
 						<div id="content">
 							<div>
 								<!-- <div><span>scene-id:</span><input id="scene-id" /></div> -->
-								<div><span>desc:</span><input id="scene-desc" /></div>
-								<div><span>start time:</span><input id="scene-start-time" /></div>
-								<div><span>seconds:</span><input id="scene-seconds" /></div>
+								<div><span>描述:</span><input id="scene-desc" /></div>
+								<div><span>开始时间:</span><input id="scene-start-time" /></div>
+								<div><span>秒数:</span><input id="scene-seconds" /></div>
 
 								<div>
-									<button id="btn-generate">generate</button>									
+									<button id="btn-generate">生成</button>									
 								</div>
 
 								<div id="log">
@@ -1038,7 +1037,7 @@
 				<div id="log-wrapper" class="popup-window-wrapper" tabindex='-1'>
 					<div id="view">
 						<div id="header">
-							<span id="title">Output</span>
+							<span id="title">输出</span>
 							<div id="buttons">
 								<!-- <div id="btn-restore" class="ui-button"  title="restore">
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
@@ -1051,13 +1050,13 @@
 									</g></svg>
 								</div> -->
 		
-								<div id="btn-clear" class="ui-button"  title="clear logs">
+								<div id="btn-clear" class="ui-button"  title="清除日志">
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<circle cx = 12 cy=12 r= 8 />
 										<polyline points="7 7 17 17" />
 									</g></svg>
 								</div>
-								<div id="btn-exit" class="ui-button"  title="exit">
+								<div id="btn-exit" class="ui-button"  title="退出">
 									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 										<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
 									</g></svg>
@@ -1065,8 +1064,8 @@
 							</div>
 						</div>
 						<div id="tabs">
-							<div id = "tab-log" class="tab-button tab-selected">Logs</div>
-							<div id = "tab-error" class="tab-button">Errors</div>
+							<div id = "tab-log" class="tab-button tab-selected">日志</div>
+							<div id = "tab-error" class="tab-button">错误</div>
 						</div>
 						<div id="content-logs">
 						</div>
@@ -1113,7 +1112,7 @@
 						<rect x="100" y="110" width="20" height="20" fill="#00000000" class="line-handle grab-handle" id="move-handle"/>
 					</svg>
 					<div class="v-buttons-wrapper" id="v-buttons">
-						<div id="v-fit-position" class="ui-button"  title="Fit position">
+						<div id="v-fit-position" class="ui-button"  title="适配位置">
 							<!-- <span class="ui-icon ui-icon-arrow-4"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<!-- <polyline points="3 5 15 3 17 13 5 15 3 5" stroke-dasharray="1" /> -->
@@ -1122,7 +1121,7 @@
    								<rect x="4" y="4" width="12" height="12"/>
 							</g></svg>
 						</div>
-						<div id="v-fit-rotation" class="ui-button"  title="Fit Rotation">
+						<div id="v-fit-rotation" class="ui-button"  title="适配旋转">
 							<!-- <span class="ui-icon ui-icon-arrow-1-n"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<rect x="8" y="10" width="12" height="10"/>
@@ -1130,7 +1129,7 @@
 							</g></svg>
 						</div>
 
-						<div id="v-fit-size" class="ui-button"  title="Fit size">
+						<div id="v-fit-size" class="ui-button"  title="适配大小">
 							<!-- <span class="ui-icon ui-icon-arrow-4"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<!-- <polyline points="3 5 15 3 17 13 5 15 3 5" stroke-dasharray="1" /> -->
@@ -1141,7 +1140,7 @@
 						</div>
 
 
-						<div id="v-fit-all" class="ui-button"  title="Fit all">
+						<div id="v-fit-all" class="ui-button"  title="全部适配">
 							<!-- <span class="ui-icon ui-icon-arrow-2-n-s"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<rect x="6" y="6" width="14" height="14"/>
@@ -1149,7 +1148,7 @@
 							</g></svg>
 						</div>
 
-						<div id="v-fit-moving-direction" class="ui-button"  title="Fit moving direction">
+						<div id="v-fit-moving-direction" class="ui-button"  title="适配移动方向">
 							<!-- <span class="ui-icon ui-icon-arrow-2-n-s"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<polyline points="6 18 14 10"/>
@@ -1194,14 +1193,14 @@
 
 					</svg>
 					<div class="v-buttons-wrapper" id="v-buttons">
-						<div id="v-fit-all" class="ui-button"  title="fit all">
+						<div id="v-fit-all" class="ui-button"  title="全部适配">
 							<!-- <span class="ui-icon ui-icon-key"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<rect x="6" y="6" width="14" height="14"/>
    								<polyline points="3 5 15 3 17 13 5 15 3 5" stroke-dasharray="1" />
 							</g></svg>
 						</div>
-						<div id="v-reset-rotation" class="ui-button"  title="reset rotation">
+						<div id="v-reset-rotation" class="ui-button"  title="重置旋转">
 							<!-- <span class="ui-icon ui-icon-refresh"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<circle  cx=12 cy=12 r=8 />
@@ -1237,14 +1236,14 @@
 
 					</svg>
 					<div class="v-buttons-wrapper" id="v-buttons">
-						<div id="v-fit-all" class="ui-button"  title="fit all">
+						<div id="v-fit-all" class="ui-button"  title="全部适配">
 							<!-- <span class="ui-icon ui-icon-key"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<rect x="6" y="6" width="14" height="14"/>
 								<polyline points="3 5 15 3 17 13 5 15 3 5" stroke-dasharray="1" />
 							</g></svg>
 						</div>
-						<div id="v-reset-rotation" class="ui-button"  title="reset rotation">
+						<div id="v-reset-rotation" class="ui-button"  title="重置旋转">
 							<!-- <span class="ui-icon ui-icon-refresh"></span> -->
 							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
 								<circle  cx=12 cy=12 r=8 />
@@ -1263,17 +1262,17 @@
 
 					
 
-					<div class="menu-button" id="exit">Exit</div>
+					<div class="menu-button" id="exit">退出</div>
 
-					<div class="menu-button" id="prev">Previous</div>
-					<div class="menu-button" id="next">Next</div>
+					<div class="menu-button" id="prev">上一个</div>
+					<div class="menu-button" id="next">下一个</div>
 					
-					<div class="menu-button" id="trajectory">Trajectory</div>
-					<div class="menu-button" id="auto-annotate">Auto</div>
-					<div class="menu-button" id="auto-annotate-translate-only">Auto (no rotation) </div>
-					<div class="menu-button" id="interpolate">Interpolate</div>
-					<div class="menu-button" id="reload">Reload</div>
-					<div class="menu-button" id="finalize">Finalize</div>
+					<div class="menu-button" id="trajectory">轨迹</div>
+					<div class="menu-button" id="auto-annotate">自动</div>
+					<div class="menu-button" id="auto-annotate-translate-only">自动 (无旋转) </div>
+					<div class="menu-button" id="interpolate">插值</div>
+					<div class="menu-button" id="reload">重新加载</div>
+					<div class="menu-button" id="finalize">完成</div>
 					
 					<!-- <div class="menu-button" id="save">Save</div> -->
 					

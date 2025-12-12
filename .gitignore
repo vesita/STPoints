@@ -8,4 +8,5 @@ temp
 image_temp
 tools/pypcd
 temp*/
-messages/
+cache/
+config/backups/
