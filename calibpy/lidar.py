@@ -74,7 +74,8 @@ class Lidar:
     
     def target_corners(self):
         """
-        获取LiDAR坐标系中的棋盘格角点，并应用坐标系变换
+        获取LiDAR坐标系中的棋盘格角点，不进行额外的坐标变换
+        注意：此方法直接返回LiDAR坐标系中的点，坐标变换将在后续处理中进行
         """
         cloud = self.target_cloud()
         print(f"LiDAR目标点云数量: {len(cloud)}")
@@ -95,16 +96,8 @@ class Lidar:
         corner_board = self.corner_caliboard(corner8)
         print(f"棋盘格角点数量: {len(corner_board)}")
         
-        # 应用坐标系变换 (ROS到OpenCV): (x, y, z) -> (z, -x, -y)
-        if len(corner_board) > 0:
-            points_array = np.array(corner_board)
-            transformed_points = np.column_stack([
-                points_array[:, 2],    # z -> x
-                -points_array[:, 0],   # -x -> y
-                -points_array[:, 1]    # -y -> z
-            ])
-            return transformed_points
-        
+        # 不在此处应用坐标变换，直接返回LiDAR坐标系中的点
+        # 坐标变换将在后续的投影计算中进行
         return corner_board
     
     def cloud2box(self, cloud):
@@ -196,34 +189,12 @@ class Lidar:
         print(f"包围盒Y范围: [{y_min:.3f}, {y_max:.3f}]")
         print(f"包围盒Z范围: [{z_min:.3f}, {z_max:.3f}]")
         
-        # 确定哪个表面朝向相机（选择面积最大的表面）
-        # 计算三个表面的面积
-        area_x = (y_max - y_min) * (z_max - z_min)  # YZ平面
-        area_y = (x_max - x_min) * (z_max - z_min)  # XZ平面
-        area_z = (x_max - x_min) * (y_max - y_min)  # XY平面
-        
-        print(f"表面面积 - X方向: {area_x:.3f}, Y方向: {area_y:.3f}, Z方向: {area_z:.3f}")
-        
-        # 选择面积最大的表面
-        max_area = max(area_x, area_y, area_z)
-        if max_area == area_x:
-            # YZ平面，固定X坐标
-            fixed_val = x_max if np.sum(corners[:, 0] > (x_min + x_max) / 2) > 2 else x_min
-            surface_points = corners[np.abs(corners[:, 0] - fixed_val) < 1e-3]
-            plane_type = "YZ"
-            fixed_coord = fixed_val
-        elif max_area == area_y:
-            # XZ平面，固定Y坐标
-            fixed_val = y_max if np.sum(corners[:, 1] > (y_min + y_max) / 2) > 2 else y_min
-            surface_points = corners[np.abs(corners[:, 1] - fixed_val) < 1e-3]
-            plane_type = "XZ"
-            fixed_coord = fixed_val
-        else:
-            # XY平面，固定Z坐标
-            fixed_val = z_max if np.sum(corners[:, 2] > (z_min + z_max) / 2) > 2 else z_min
-            surface_points = corners[np.abs(corners[:, 2] - fixed_val) < 1e-3]
-            plane_type = "XY"
-            fixed_coord = fixed_val
+        # 总是选择YZ平面（固定X坐标）以确保一致性
+        # 这样可以确保不同数据集之间的坐标处理一致性
+        fixed_val = x_max if np.sum(corners[:, 0] > (x_min + x_max) / 2) > 2 else x_min
+        surface_points = corners[np.abs(corners[:, 0] - fixed_val) < 1e-3]
+        plane_type = "YZ"
+        fixed_coord = fixed_val
             
         print(f"选择的表面: {plane_type} 平面, 固定坐标值: {fixed_coord:.3f}")
         print(f"表面点数量: {len(surface_points)}")

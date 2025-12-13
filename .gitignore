@@ -10,3 +10,4 @@ tools/pypcd
 temp*/
 cache/
 config/backups/
+eval_images/
