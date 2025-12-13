@@ -84,64 +84,12 @@ def save_camera_extrinsic(extrinsic_matrix, config_file_path="./config/config.js
         return False
 
 
-def save_js_compatible_camera_extrinsic(extrinsic_matrix, config_file_path="./config/config.json"):
-    """
-    将标定得到的相机外参矩阵转换为JS兼容的坐标系统并保存到配置文件中
-    
-    在JavaScript中使用的坐标变换矩阵:
-    [0, -1,  0,  0]
-    [0,  0, -1,  0]
-    [1,  0,  0,  0]
-    [0,  0,  0,  1]
-    
-    Args:
-        extrinsic_matrix: 4x4的相机外参矩阵
-        config_file_path: 配置文件路径
-    """
-    # 检查配置文件是否存在
-    if not os.path.exists(config_file_path):
-        print(f"配置文件 {config_file_path} 不存在")
-        return False
-    
-    try:
-        # 定义从Python到JavaScript坐标系统的变换矩阵
-        view_matrix = np.array([
-            [0,  0,  1,  0],
-            [-1,  0, 0,  0],
-            [0,  -1,  0,  0],
-            [0,  0,  0,  1]
-        ], dtype=np.float32)
-        
-        # 转换外参矩阵以适应JavaScript坐标系统
-        # JS使用: viewMatrix * extrinsic
-        js_compatible_extrinsic = view_matrix @ extrinsic_matrix
-        
-        # 读取现有配置
-        with open(config_file_path, 'r') as f:
-            config_data = json.load(f)
-        
-        # 添加JS兼容的相机外参到配置中
-        js_extrinsic_list = js_compatible_extrinsic.flatten().tolist()
-        config_data["camera_extrinsic_js"] = js_extrinsic_list
-        
-        # 写回配置文件
-        with open(config_file_path, 'w') as f:
-            json.dump(config_data, f, indent=2)
-        
-        print(f"JS兼容的相机外参已保存到 {config_file_path} 的 camera_extrinsic_js 字段")
-        return True
-    except Exception as e:
-        print(f"保存JS兼容的相机外参时出错: {e}")
-        return False
-
-
 def main():
     print("开始相机标定过程...")
     cam = camera.Camera()
     lid = lidar.Lidar()
     
     print("获取LiDAR生成的棋盘格3D点...")
-    # 注意：这里获取的是LiDAR坐标系中的点，已经经过坐标变换
     caliboard3D = lid.target_corners()
     print("获取图像中的棋盘格2D点...")
     caliboard2D = cam.get_caliboard()
@@ -149,197 +97,99 @@ def main():
     print(f"3D点数量: {len(caliboard3D) if caliboard3D is not None else 'None'}")
     print(f"2D点数量: {len(caliboard2D) if caliboard2D is not None else 'None'}")
     
-    # 使用PnP计算相机外参
-    # 增加对 None 和空数组的检查
-    if caliboard3D is not None and len(caliboard3D) > 0 and caliboard2D is not None and len(caliboard2D) > 0:
-        # 确保点的数量相同
-        if len(caliboard3D) == len(caliboard2D):
-            # 转换为numpy数组
-            object_points = np.array(caliboard3D, dtype=np.float32)
-            image_points = np.array(caliboard2D, dtype=np.float32)
-            
-            print(f"object_points shape: {object_points.shape}")
-            print(f"image_points shape: {image_points.shape}")
-            
-            # 输出一些样本点用于调试
-            print("前5个3D点:")
-            print(object_points[:5])
-            print("前5个2D点:")
-            print(image_points[:5])
-            
-            # 检查是否有无效值
-            if np.isnan(object_points).any() or np.isinf(object_points).any():
-                print("错误：3D点中包含NaN或Inf值")
-                return
-                
-            if np.isnan(image_points).any() or np.isinf(image_points).any():
-                print("错误：2D点中包含NaN或Inf值")
-                return
-            
-            # 确保3D点是N×3的形状，2D点是N×2的形状
-            if len(object_points.shape) != 2 or object_points.shape[1] != 3:
-                print(f"错误：3D点形状不正确，期望(N,3)，实际{object_points.shape}")
-                return
-                
-            if len(image_points.shape) != 2 or image_points.shape[1] != 2:
-                print(f"错误：2D点形状不正确，期望(N,2)，实际{image_points.shape}")
-                return
-            
-            print(f"处理后 object_points shape: {object_points.shape}")
-            print(f"处理后 image_points shape: {image_points.shape}")
-            
-            # 验证坐标范围
-            print("\n坐标范围验证:")
-            print(f"3D点坐标范围 - X:{np.min(object_points[:,0]):.3f}~{np.max(object_points[:,0]):.3f}, "
-                  f"Y:{np.min(object_points[:,1]):.3f}~{np.max(object_points[:,1]):.3f}, "
-                  f"Z:{np.min(object_points[:,2]):.3f}~{np.max(object_points[:,2]):.3f}")
-            print(f"2D点坐标范围 - U:{np.min(image_points[:,0]):.3f}~{np.max(image_points[:,0]):.3f}, "
-                  f"V:{np.min(image_points[:,1]):.3f}~{np.max(image_points[:,1]):.3f}")
-            
-            # 确保有足够的点进行solvePnP (至少4个点)
-            if len(object_points) < 4 or len(image_points) < 4:
-                print(f"点数不足，需要至少4个点，当前3D点数: {len(object_points)}, 2D点数: {len(image_points)}")
-                return
-                
-            # 确保内参矩阵已定义
-            camera_matrix = np.array(cam.intrinsic, dtype=np.float32)
-            print(f"相机内参矩阵: \n{camera_matrix}")
-            
-            # 使用从配置文件加载的畸变系数，确保正确的形状
-            dist_coeffs = np.array(cam.distortion_coefficients, dtype=np.float32).reshape(1, -1)
-            
-            print("开始调用solvePnP...")
-            print(f"solvePnP参数类型检查:")
-            print(f"  object_points类型: {type(object_points)}, 形状: {object_points.shape if hasattr(object_points, 'shape') else '无形状属性'}")
-            print(f"  image_points类型: {type(image_points)}, 形状: {image_points.shape if hasattr(image_points, 'shape') else '无形状属性'}")
-            print(f"  camera_matrix类型: {type(camera_matrix)}, 形状: {camera_matrix.shape if hasattr(camera_matrix, 'shape') else '无形状属性'}")
-            print(f"  dist_coeffs类型: {type(dist_coeffs)}, 形状: {dist_coeffs.shape if hasattr(dist_coeffs, 'shape') else '无形状属性'}")
-            
-            # 尝试不同的solvePnP方法
-            methods = [
-                (cv2.SOLVEPNP_ITERATIVE, "SOLVEPNP_ITERATIVE"),
-                (cv2.SOLVEPNP_P3P, "SOLVEPNP_P3P"),
-                (cv2.SOLVEPNP_AP3P, "SOLVEPNP_AP3P"),
-                (cv2.SOLVEPNP_EPNP, "SOLVEPNP_EPNP"),
-                (cv2.SOLVEPNP_IPPE, "SOLVEPNP_IPPE")
-            ]
-            
-            best_result = None
-            best_error = float('inf')
-            
-            for method_flag, method_name in methods:
-                try:
-                    print(f"尝试方法: {method_name}")
-                    # 验证输入参数
-                    assert object_points.shape[1] == 3, f"object_points 应为 Nx3 形状，实际为 {object_points.shape}"
-                    assert image_points.shape[1] == 2, f"image_points 应为 Nx2 形状，实际为 {image_points.shape}"
-                    assert camera_matrix.shape == (3, 3), f"camera_matrix 应为 3x3 形状，实际为 {camera_matrix.shape}"
-                    assert dist_coeffs.ndim == 2 and dist_coeffs.shape[0] == 1, f"dist_coeffs 应为 1xN 形状，实际为 {dist_coeffs.shape}"
+    # 确保点的数量相同
+    if len(caliboard3D) == len(caliboard2D):
+        # 转换为numpy数组
+        object_points = np.array(caliboard3D, dtype=np.float32)
+        image_points = np.array(caliboard2D, dtype=np.float32)
 
-                    success, rvec, tvec = cv2.solvePnP(
-                        object_points, 
-                        image_points, 
-                        camera_matrix, 
-                        dist_coeffs,
-                        flags=method_flag
-                    )
-                    
-                    if success:
-                        # 计算重投影误差
-                        projected_points, _ = cv2.projectPoints(
-                            object_points, rvec, tvec, camera_matrix, dist_coeffs)
-                        
-                        projected_points = projected_points.reshape(-1, 2)
-                        reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
-                        
-                        print(f"  方法 {method_name} 重投影误差: {reprojection_error:.2f} 像素")
-                        
-                        if reprojection_error < best_error:
-                            best_error = reprojection_error
-                            best_result = (success, rvec, tvec, method_name)
-                    else:
-                        print(f"  方法 {method_name} 求解失败")
-                except Exception as e:
-                    print(f"  方法 {method_name} 出错: {e}")
+        # 验证坐标范围
+        print("\n坐标范围验证:")
+        print(f"3D点坐标范围 - X:{np.min(object_points[:,0]):.3f}~{np.max(object_points[:,0]):.3f}, "
+                f"Y:{np.min(object_points[:,1]):.3f}~{np.max(object_points[:,1]):.3f}, "
+                f"Z:{np.min(object_points[:,2]):.3f}~{np.max(object_points[:,2]):.3f}")
+        print(f"2D点坐标范围 - U:{np.min(image_points[:,0]):.3f}~{np.max(image_points[:,0]):.3f}, "
+                f"V:{np.min(image_points[:,1]):.3f}~{np.max(image_points[:,1]):.3f}")
+        
+        # 确保有足够的点进行solvePnP (至少4个点)
+        if len(object_points) < 4 or len(image_points) < 4:
+            print(f"点数不足，需要至少4个点，当前3D点数: {len(object_points)}, 2D点数: {len(image_points)}")
+            return
             
-            if best_result:
-                success, rvec, tvec, method_name = best_result
-                print(f"选择最佳方法: {method_name}，重投影误差: {best_error:.4f} 像素")
-                
-                # 检查旋转矩阵的正交性
-                rotation_matrix, _ = cv2.Rodrigues(rvec)
-                print("\n旋转矩阵正交性检查:", end=" ")
-                identity_check = np.allclose(rotation_matrix @ rotation_matrix.T, np.eye(3))
-                determinant_check = np.allclose(np.linalg.det(rotation_matrix), 1.0)
-                if identity_check and determinant_check:
-                    print("通过")
+        # 确保内参矩阵已定义
+        camera_matrix = np.array(cam.intrinsic, dtype=np.float32)
+        print(f"相机内参矩阵: \n{camera_matrix}")
+        
+        # 使用从配置文件加载的畸变系数，确保正确的形状
+        dist_coeffs = np.array(cam.distortion_coefficients, dtype=np.float32).reshape(1, -1)
+        
+        best_result = None
+        best_error = float('inf')
+        
+        success, rvec, tvec = cv2.solvePnP(
+            object_points, 
+            image_points, 
+            camera_matrix, 
+            dist_coeffs,
+            flags=cv2.SOLVEPNP_ITERATIVE
+        )
+        
+        if success:
+            # 计算重投影误差
+            projected_points, _ = cv2.projectPoints(
+                object_points, rvec, tvec, camera_matrix, dist_coeffs)
+            
+            projected_points = projected_points.reshape(-1, 2)
+            reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
+            
+            print(f"  方法 pnp 重投影误差: {reprojection_error:.2f} 像素")
+            
+            # 检查旋转矩阵的正交性
+            rotation_matrix, _ = cv2.Rodrigues(rvec)
+            print("\n旋转矩阵正交性检查:", end=" ")
+            identity_check = np.allclose(rotation_matrix @ rotation_matrix.T, np.eye(3))
+            determinant_check = np.allclose(np.linalg.det(rotation_matrix), 1.0)
+            
+            # 构造4x4的变换矩阵（从LiDAR坐标系到相机坐标系）
+            extrinsic_matrix = np.eye(4, dtype=np.float32)
+            extrinsic_matrix[:3, :3] = rotation_matrix
+            extrinsic_matrix[:3, 3] = tvec.flatten()
+            
+            print("\n外参矩阵详细信息 (LiDAR到相机):")
+            print("旋转矩阵 R:")
+            print(rotation_matrix)
+            print("平移向量 T:", tvec.flatten())
+            print("\n完整4x4外参矩阵:")
+            print(extrinsic_matrix)
+            
+            # 验证变换矩阵
+            print(f"\n变换矩阵验证:")
+            print(f"  行列式: {np.linalg.det(rotation_matrix):.6f} " 
+                    f"(理想值接近1.0)")
+            print(f"  平移距离: {np.linalg.norm(tvec):.4f} 米")
+            
+            # 计算重投影误差
+            projected_points, _ = cv2.projectPoints(
+                object_points, rvec, tvec, camera_matrix, dist_coeffs)
+            
+            # 计算均方根误差
+            projected_points = projected_points.reshape(-1, 2)
+            reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
+            
+            print(f"最终重投影误差: {reprojection_error} 像素")
+            
+            # 询问用户是否保存标定结果
+            save_choice = input("是否将标定结果保存并覆盖相机外参？(y/N): ")
+            if save_choice.lower() in ['y', 'yes']:
+                # 先备份配置文件
+                print("正在备份当前配置文件...")
+                if backup_config():
+                    # 保存外参矩阵到配置文件
+                    save_camera_extrinsic(extrinsic_matrix)
                 else:
-                    print("未通过")
-                    print(f"  R*R^T = I: {identity_check}")
-                    print(f"  det(R) = 1: {determinant_check}")
-                
-                # 构造4x4的变换矩阵（从LiDAR坐标系到相机坐标系）
-                extrinsic_matrix = np.eye(4, dtype=np.float32)
-                extrinsic_matrix[:3, :3] = rotation_matrix
-                extrinsic_matrix[:3, 3] = tvec.flatten()
-                
-                print("\n外参矩阵详细信息 (LiDAR到相机):")
-                print("旋转矩阵 R:")
-                print(rotation_matrix)
-                print("平移向量 T:", tvec.flatten())
-                print("\n完整4x4外参矩阵:")
-                print(extrinsic_matrix)
-                
-                # 验证变换矩阵
-                print(f"\n变换矩阵验证:")
-                print(f"  行列式: {np.linalg.det(rotation_matrix):.6f} " 
-                      f"(理想值接近1.0)")
-                print(f"  平移距离: {np.linalg.norm(tvec):.4f} 米")
-                
-                # 计算重投影误差
-                projected_points, _ = cv2.projectPoints(
-                    object_points, rvec, tvec, camera_matrix, dist_coeffs)
-                
-                # 计算均方根误差
-                projected_points = projected_points.reshape(-1, 2)
-                reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
-                
-                print(f"最终重投影误差: {reprojection_error} 像素")
-                
-                # 询问用户是否保存标定结果
-                save_choice = input("是否将标定结果保存并覆盖相机外参？(y/N): ")
-                if save_choice.lower() in ['y', 'yes']:
-                    # 先备份配置文件
-                    print("正在备份当前配置文件...")
-                    if backup_config():
-                        # 保存外参矩阵到配置文件
-                        if save_camera_extrinsic(extrinsic_matrix):
-                            '''# 同时保存JS兼容的外参矩阵
-                            if save_js_compatible_camera_extrinsic(extrinsic_matrix):
-                                print("相机外参及JS兼容外参已成功更新")
-                            else:
-                                print("保存JS兼容外参失败")'''
-                        else:
-                            print("保存相机外参失败")
-                    else:
-                        print("备份失败，取消保存操作")
-                else:
-                    print("未保存相机外参")
+                    print("备份失败，取消保存操作")
             else:
-                print("所有PnP方法都失败了")
-        else:
-            print(f"点数量不匹配: 3D点 ({len(caliboard3D)}) vs 2D点 ({len(caliboard2D)})")
-    else:
-        print("未找到标定点")
-        if caliboard3D is None:
-            print("3D点为 None")
-        elif len(caliboard3D) == 0:
-            print("3D点为空")
-            
-        if caliboard2D is None:
-            print("2D点为 None")
-        elif len(caliboard2D) == 0:
-            print("2D点为空")
+                print("未保存相机外参")
 
 
 if __name__ == "__main__":

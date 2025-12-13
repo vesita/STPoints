@@ -48,9 +48,9 @@ class Target:
             target_path = config.target_path
             
         # 只使用一个固定的文件组合，而不是读取整个目录
-        self.image = os.path.join(target_path, f"{index}.jpg")
-        self.cloud = os.path.join(target_path, f"{index}.pcd")
-        self.label = os.path.join(target_path, f"{index}.json")
+        self.image = os.path.join(target_path, f"image.jpg")
+        self.cloud = os.path.join(target_path, f"cloud.pcd")
+        self.label = os.path.join(target_path, f"label.json")
         
         # 确保文件存在
         if not os.path.exists(self.image):

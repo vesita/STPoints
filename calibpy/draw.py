@@ -5,6 +5,8 @@
 绘制脚本，用于验证相机-LiDAR外参计算的正确性
 """
 
+import os
+import time
 import cv2
 import numpy as np
 from PIL import Image
@@ -88,8 +90,6 @@ class CalibrationVisualizer:
         # 获取LiDAR坐标系中的标定板角点
         lidar_board_corners = self.lid.target_corners()
         print(f"LiDAR棋盘格角点数量: {len(lidar_board_corners)}")
-        print("前10个LiDAR棋盘格角点:")
-        print(lidar_board_corners[:10] if len(lidar_board_corners) > 0 else "无数据")
         
         # 获取相机内外参
         camera_matrix = self.cam.intrinsic
@@ -102,7 +102,6 @@ class CalibrationVisualizer:
         print(f"旋转矩阵 (rvec):\n{rvec}")
         print(f"平移向量 (tvec):\n{tvec}")
         
-        # 直接使用LiDAR坐标系中的点进行投影（与calib.py保持一致）
         lidar_projected_corners, _ = cv2.projectPoints(
             lidar_board_corners.astype(np.float32), 
             rvec, tvec, 
@@ -114,8 +113,6 @@ class CalibrationVisualizer:
         # 获取图像中检测到的棋盘格角点
         image_corners = self.cam.get_caliboard()
         print(f"图像检测角点数量: {len(image_corners)}")
-        print("前10个图像检测角点:")
-        print(image_corners[:10] if len(image_corners) > 0 else "无数据")
         
         print(f"LiDAR投影角点数量: {len(lidar_projected_corners)}")
         print(f"图像检测角点数量: {len(image_corners)}")
@@ -137,41 +134,29 @@ class CalibrationVisualizer:
                 cv2.putText(image_cv, f'I{i}', (int(x)+5, int(y)+15), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
         
-        # 使用LiDAR坐标系中的点进行重投影以计算误差（与calib.py保持一致）
-        projected_points, _ = cv2.projectPoints(
-            lidar_board_corners.astype(np.float32), 
-            rvec, tvec, 
-            camera_matrix.astype(np.float32), 
-            dist_coeffs.astype(np.float32))
-        
-        # 计算重投影误差 (均方根误差)，此计算方式必须与calib.py中的评估标准一致
-        projected_points = projected_points.reshape(-1, 2)
-        print("前10个重投影点:")
-        print(projected_points[:10])
-        print("前10个图像检测点:")
-        print(image_corners[:10])
-        
-        # 确保点数量一致
-        num_points = min(len(image_corners), len(projected_points))
-        image_corners_subset = image_corners[:num_points]
-        projected_points_subset = projected_points[:num_points]
         
         # 使用欧氏距离的均方根作为重投影误差
-        reprojection_error = np.sqrt(np.mean((image_corners_subset - projected_points_subset) ** 2))
+        reprojection_error = np.sqrt(np.mean((image_corners - lidar_projected_corners) ** 2))
         
         print(f"重投影误差统计:")
         print(f"  平均误差: {reprojection_error:.2f} 像素")
-        print(f"  使用点数: {num_points}")
+        print(f"  使用点数: {image_corners.shape[0]}")
         
         # 在图像上显示误差信息
         cv2.putText(image_cv, f'重投影误差: {reprojection_error:.2f} 像素', 
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         
-        # 保存带标注的图像
         if save_image:
-            cv2.imwrite('calibration_result.png', image_cv)
-            print("已保存标注图像到 calibration_result.png")
-        
+            # 确保目录存在
+            os.makedirs('temp/image', exist_ok=True)
+            
+            # 生成时间戳文件名
+            timestamp = int(time.time())
+            save_path = f'temp/image/calibration_result_{timestamp}.png'
+            
+            cv2.imwrite(save_path, image_cv)
+            print(f"已保存标注图像到 {save_path}")
+
         return {
             'image': image_cv,
             'reprojection_error': reprojection_error,

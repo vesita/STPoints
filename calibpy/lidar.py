@@ -101,11 +101,15 @@ class Lidar:
         corner_board = corner_caliboard(box["position"], box["rotation"], box["scale"])
         print(f"棋盘格角点数量: {len(corner_board)}")
         
-        # 不在此处应用坐标变换，直接返回LiDAR坐标系中的点
-        # 坐标变换将在后续的投影计算中进行
-        return corner_board
+        return self.to_world(corner_board)
     
-
+    def to_world(self, points):
+        rot = self.extrinsic[:3, :3]
+        result = []
+        for point in points:
+            rotated_point = np.dot(rot.T, point)
+            result.append(rotated_point)
+        return np.array(result)
     
 def corner_caliboard(position, rotation, scale):
     
