@@ -95,10 +95,10 @@ class Lidar:
         
         box = min_box(cloud)
         # 使用cloud.py中的逻辑计算包围盒角点
-        corners = box_corners(box["postion"], box["rotation"], box["scale"])
+        corners = box_corners(box["position"], box["rotation"], box["scale"])
         print(f"包围盒8个角点: {corners}")
         
-        corner_board = corner_caliboard(box["postion"], box["rotation"], box["scale"])
+        corner_board = corner_caliboard(box["position"], box["rotation"], box["scale"])
         print(f"棋盘格角点数量: {len(corner_board)}")
         
         # 不在此处应用坐标变换，直接返回LiDAR坐标系中的点
@@ -164,7 +164,8 @@ def corner_caliboard(position, rotation, scale):
         rotated_point[2] += position["z"]
         result.append(rotated_point)
     
-    return result
+    # 返回numpy数组而不是普通列表
+    return np.array(result)
 
 def box_corners(position, rotation, scale):
     original = [[-scale["x"] / 2, -scale["y"] / 2, -scale["z"] / 2],
@@ -247,7 +248,7 @@ def min_box(cloud):
     rotation = rotation_matrix_to_euler_angles(eigenvectors)
     
     return {
-        'postion': {"x": center_world[0], "y": center_world[1], "z": center_world[2]},
+        'position': {"x": center_world[0], "y": center_world[1], "z": center_world[2]},
         'scale': scale,
         'rotation': rotation
     }

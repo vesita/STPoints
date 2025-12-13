@@ -71,6 +71,47 @@ def box_corners(position, rotation, scale):
         points.append(rotated_point)
     return np.array(points)
 
+def box_corners_new(position, rotation, scale):
+    """
+    新的角点计算方法，采用更清晰的方式计算包围盒的8个角点
+    """
+    # 定义包围盒的8个角点（局部坐标系中）
+    half_x = scale["x"] / 2
+    half_y = scale["y"] / 2
+    half_z = scale["z"] / 2
+    
+    corners_local = np.array([
+        [-half_x, -half_y, -half_z],  # 0: left-bottom-back
+        [ half_x, -half_y, -half_z],  # 1: right-bottom-back
+        [ half_x,  half_y, -half_z],  # 2: right-top-back
+        [-half_x,  half_y, -half_z],  # 3: left-top-back
+        [-half_x, -half_y,  half_z],  # 4: left-bottom-front
+        [ half_x, -half_y,  half_z],  # 5: right-bottom-front
+        [ half_x,  half_y,  half_z],  # 6: right-top-front
+        [-half_x,  half_y,  half_z]   # 7: left-top-front
+    ])
+    
+    # 根据欧拉角创建旋转矩阵 (ZYX约定)
+    cos_z, sin_z = np.cos(rotation["z"]), np.sin(rotation["z"])
+    cos_y, sin_y = np.cos(rotation["y"]), np.sin(rotation["y"])
+    cos_x, sin_x = np.cos(rotation["x"]), np.sin(rotation["x"])
+    
+    # 旋转矩阵
+    rot_z = np.array([[cos_z, -sin_z, 0], [sin_z, cos_z, 0], [0, 0, 1]])
+    rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
+    rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
+    
+    # 组合旋转矩阵 (R = Rx * Ry * Rz) 与原始函数保持一致
+    rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+    
+    # 将角点转换到世界坐标系
+    corners_world = np.dot(corners_local, rotation_matrix.T)
+    corners_world[:, 0] += position["x"]
+    corners_world[:, 1] += position["y"]
+    corners_world[:, 2] += position["z"]
+    
+    return corners_world
+
 def draw_box_lines(ax, corners):
     """
     在3D图中绘制包围盒的边线
@@ -95,6 +136,66 @@ def main(cloud, position, rotation, scale):
         if inside(point, position, rotation, scale):
             points_inside.append(point)
     return points_inside
+
+def corner_caliboard(position, rotation, scale):
+    
+    # 根据欧拉角创建旋转矩阵 (ZYX约定)
+    cos_z, sin_z = np.cos(rotation["z"]), np.sin(rotation["z"])
+    cos_y, sin_y = np.cos(rotation["y"]), np.sin(rotation["y"])
+    cos_x, sin_x = np.cos(rotation["x"]), np.sin(rotation["x"])
+
+    # 旋转矩阵
+    rot_z = np.array([[cos_z, -sin_z, 0], [sin_z, cos_z, 0], [0, 0, 1]])
+    rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
+    rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
+
+    # 组合旋转矩阵 (R = Rz * Ry * Rx)
+    rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+    
+    # 根据实际的x、y、z轴尺寸确定棋盘格方向，而不是简单的排序
+    # 找到最长和次长的轴
+    scale_items = [("x", scale["x"]), ("y", scale["y"]), ("z", scale["z"])]
+    scale_items.sort(key=lambda x: x[1], reverse=True)
+    
+    # 最长轴作为length方向，次长轴作为width方向
+    length_axis = scale_items[0][0]  # 最长轴名称 ("x", "y", 或 "z")
+    width_axis = scale_items[1][0]   # 次长轴名称
+    
+    # 获取对应的尺寸值
+    length = scale[length_axis]
+    width = scale[width_axis]
+    
+    # 计算棋盘格步长
+    width_step = width / (6 + 2)
+    length_step = length / (7 + 2)
+    
+    width_base = -width / 2
+    length_base = -length / 2
+    
+    points = []
+    
+    # 生成棋盘格点 (6行 x 7列)
+    for i in range(1, 7):
+        for j in range(1, 8):
+            # 创建局部坐标的初始点 (在xy平面)
+            local_point = [0, 0, 0]
+            local_point[["x", "y", "z"].index(width_axis)] = width_base + i * width_step
+            local_point[["x", "y", "z"].index(length_axis)] = length_base + j * length_step
+            
+            points.append(local_point)
+            
+    result = []
+    
+    # 应用旋转和平移到每个点
+    for point in points:
+        rotated_point = np.dot(rotation_matrix, point)
+        rotated_point[0] += position["x"]
+        rotated_point[1] += position["y"]
+        rotated_point[2] += position["z"]
+        result.append(rotated_point)
+    
+    # 返回numpy数组而不是普通列表
+    return np.array(result)
 
 
 if __name__ == "__main__":
@@ -121,22 +222,65 @@ if __name__ == "__main__":
             
     # 计算包围盒角点
     corners = box_corners(position, rotation, scale)
+    corners_new = box_corners_new(position, rotation, scale)
+    
+    # 计算校准板点（42个点 = 6行 × 7列）
+    caliboard_points = corner_caliboard(position, rotation, scale)
     
     # 使用 matplotlib 可视化过滤后的点云和包围盒
     if points:
         points_array = np.array(points)
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points_array[:, 0], points_array[:, 1], points_array[:, 2], s=1)
+        fig = plt.figure(figsize=(18, 5))
         
-        # 绘制包围盒角点和边线
-        ax.scatter(corners[:, 0], corners[:, 1], corners[:, 2], c='red', s=20)
-        draw_box_lines(ax, corners)
+        # 原始角点方法
+        ax1 = fig.add_subplot(131, projection='3d')
+        ax1.scatter(points_array[:, 0], points_array[:, 1], points_array[:, 2], s=1)
+        ax1.scatter(corners[:, 0], corners[:, 1], corners[:, 2], c='red', s=50)
+        draw_box_lines(ax1, corners)
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Y')
+        ax1.set_zlabel('Z')
+        ax1.set_title('Original Corner Calculation')
         
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.set_title('Filtered Point Cloud with Bounding Box')
+        # 新角点方法
+        ax2 = fig.add_subplot(132, projection='3d')
+        ax2.scatter(points_array[:, 0], points_array[:, 1], points_array[:, 2], s=1)
+        ax2.scatter(corners_new[:, 0], corners_new[:, 1], corners_new[:, 2], c='blue', s=50)
+        draw_box_lines(ax2, corners_new)
+        ax2.set_xlabel('X')
+        ax2.set_ylabel('Y')
+        ax2.set_zlabel('Z')
+        ax2.set_title('New Corner Calculation')
+        
+        # 显示校准板点（42个点）
+        ax3 = fig.add_subplot(133, projection='3d')
+        ax3.scatter(points_array[:, 0], points_array[:, 1], points_array[:, 2], s=1)
+        ax3.scatter(caliboard_points[:, 0], caliboard_points[:, 1], caliboard_points[:, 2], c='green', s=30)
+        ax3.set_xlabel('X')
+        ax3.set_ylabel('Y')
+        ax3.set_zlabel('Z')
+        ax3.set_title('Calibration Board Points (42 points)')
+        
+        plt.tight_layout()
         plt.show()
+        
+        # 输出两种方法的差异
+        diff = np.linalg.norm(corners - corners_new)
+        print(f"两种方法之间的差异: {diff}")
+        
+        # 显示角点坐标对比
+        print("\n原始角点:")
+        for i, corner in enumerate(corners):
+            print(f"  点 {i}: ({corner[0]:.3f}, {corner[1]:.3f}, {corner[2]:.3f})")
+            
+        print("\n新角点:")
+        for i, corner in enumerate(corners_new):
+            print(f"  点 {i}: ({corner[0]:.3f}, {corner[1]:.3f}, {corner[2]:.3f})")
+            
+        print(f"\n校准板点数量: {len(caliboard_points)}")
+        print("前几个校准板点:")
+        for i in range(min(5, len(caliboard_points))):
+            point = caliboard_points[i]
+            print(f"  点 {i}: ({point[0]:.3f}, {point[1]:.3f}, {point[2]:.3f})")
     else:
-        print("No points found inside the box")
+        print("在框内未找到点")
