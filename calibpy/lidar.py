@@ -10,38 +10,83 @@ except:
 
 class BoundingBox:
     def __init__(self):
-        self.width = 0
-        self.height = 0
-        self.depth = 0
-        self.pos = np.eye(4, 4)  # 修复：正确初始化4x4单位矩阵
+        self.position = {"x": 0, "y": 0, "z": 0}
+        self.rotation = {"x": 0, "y": 0, "z": 0}
+        self.scale = {"x": 0, "y": 0, "z": 0}
 
     def from_file(self, file_path):
         with open(file_path, 'r') as f:
             file = json.load(f)
-        self.width = file["width"]
-        self.height = file["height"]
-        self.depth = file["depth"]
-        self.pos = file["pos"]
+        psr = file[0]["psr"]
+        self.position = psr["position"]
+        self.rotation = psr["rotation"]
+        self.scale = psr["scale"]
 
     def inside(self, point):
-        # 将点转换为包围盒局部坐标系
-        # 创建齐次坐标
-        point_homo = np.array([point[0], point[1], point[2], 1.0])
+        """
+        检查点是否在由位置、旋转和尺度定义的盒子内
+        点云和标签使用相同坐标系，但仍需要正确的坐标变换
+        """
+        # 将点转换到盒子坐标系
+        dx = point[0] - self.position["x"]
+        dy = point[1] - self.position["y"]
+        dz = point[2] - self.position["z"]
         
-        # 获取包围盒的逆变换矩阵，将点转换到包围盒局部坐标系
-        inv_transform = np.linalg.inv(self.pos)
-        local_point = inv_transform @ point_homo
+        # 根据欧拉角创建旋转矩阵 (ZYX约定)
+        cos_z, sin_z = np.cos(self.rotation["z"]), np.sin(self.rotation["z"])
+        cos_y, sin_y = np.cos(self.rotation["y"]), np.sin(self.rotation["y"])
+        cos_x, sin_x = np.cos(self.rotation["x"]), np.sin(self.rotation["x"])
         
-        # 在局部坐标系中检查点是否在包围盒内
-        half_width = self.width / 2
-        half_height = self.height / 2
-        half_depth = self.depth / 2
+        # 旋转矩阵
+        rot_z = np.array([[cos_z, -sin_z, 0], [sin_z, cos_z, 0], [0, 0, 1]])
+        rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
+        rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
         
+        # 组合旋转矩阵 (R = Rz * Ry * Rx)
+        rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+        
+        # 对点应用逆变换(旋转矩阵的转置)
+        local_point = np.dot(rotation_matrix.T, [dx, dy, dz])
+        
+        # 检查点是否在盒子内
         return (
-            abs(local_point[0]) <= half_width and
-            abs(local_point[1]) <= half_height and
-            abs(local_point[2]) <= half_depth
+            abs(local_point[0]) <= self.scale["x"] / 2 and
+            abs(local_point[1]) <= self.scale["y"] / 2 and
+            abs(local_point[2]) <= self.scale["z"] / 2
         )
+
+
+def box_corners(position, rotation, scale):
+    original = [[-scale["x"] / 2, -scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, -scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, -scale["y"] / 2, scale["z"] / 2],
+                [-scale["x"] / 2, -scale["y"] / 2, scale["z"] / 2],
+                [-scale["x"] / 2, scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, scale["y"] / 2, -scale["z"] / 2],
+                [scale["x"] / 2, scale["y"] / 2, scale["z"] / 2],
+                [-scale["x"] / 2, scale["y"] / 2, scale["z"] / 2]]
+    
+    # 根据欧拉角创建旋转矩阵 (ZYX约定)
+    cos_z, sin_z = np.cos(rotation["z"]), np.sin(rotation["z"])
+    cos_y, sin_y = np.cos(rotation["y"]), np.sin(rotation["y"])
+    cos_x, sin_x = np.cos(rotation["x"]), np.sin(rotation["x"])
+    
+    # 旋转矩阵
+    rot_z = np.array([[cos_z, -sin_z, 0], [sin_z, cos_z, 0], [0, 0, 1]])
+    rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
+    rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
+    
+    # 组合旋转矩阵 (R = Rz * Ry * Rx)
+    rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+    
+    points = []
+    for point in original:
+        rotated_point = np.dot(rotation_matrix, point)
+        rotated_point[0] += position["x"]
+        rotated_point[1] += position["y"]
+        rotated_point[2] += position["z"]
+        points.append(rotated_point)
+    return np.array(points)
 
 
 class Lidar:
@@ -87,13 +132,15 @@ class Lidar:
                   f"Y[{np.min(points_array[:, 1]):.3f}, {np.max(points_array[:, 1]):.3f}], "
                   f"Z[{np.min(points_array[:, 2]):.3f}, {np.max(points_array[:, 2]):.3f}]")
         
-        box = self.cloud2box(cloud)
-        print(f"包围盒信息: {box}")
+        # 使用cloud.py中的逻辑计算包围盒角点
+        corners = box_corners(
+            self.bounding_box.position,
+            self.bounding_box.rotation,
+            self.bounding_box.scale
+        )
+        print(f"包围盒8个角点: {corners}")
         
-        corner8 = self.box_corners(box)
-        print(f"包围盒8个角点: {corner8}")
-        
-        corner_board = self.corner_caliboard(corner8)
+        corner_board = self.corner_caliboard(corners)
         print(f"棋盘格角点数量: {len(corner_board)}")
         
         # 不在此处应用坐标变换，直接返回LiDAR坐标系中的点
