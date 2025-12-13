@@ -80,17 +80,14 @@ class Lidar:
         注意：这里返回的是LiDAR坐标系中的点，不是世界坐标系中的点
         """
         points = self.target_cloud_self()
-        # 如果没有点在包围盒内，返回空列表而不是 None
-        if len(points) == 0:
-            return []
-        return points
+        return self.to_world(points)
     
     def target_corners(self):
         """
         获取LiDAR坐标系中的棋盘格角点，不进行额外的坐标变换
         注意：此方法直接返回LiDAR坐标系中的点，坐标变换将在后续处理中进行
         """
-        cloud = self.target_cloud()
+        cloud = self.target_cloud_self()
         print(f"LiDAR目标点云数量: {len(cloud)}")
         
         box = min_box(cloud)
@@ -108,6 +105,8 @@ class Lidar:
         result = []
         for point in points:
             rotated_point = np.dot(rot.T, point)
+            # point = [-point[1], -point[2], point[0]]
+            # result.append(point)
             result.append(rotated_point)
         return np.array(result)
     
@@ -139,22 +138,28 @@ def corner_caliboard(position, rotation, scale):
     length = scale[length_axis]
     width = scale[width_axis]
     
-    # 计算棋盘格步长
-    width_step = width / (6 + 2)
-    length_step = length / (7 + 2)
+    # 使用固定步长而不是按比例分配，确保棋盘格点均匀分布
+    # 这样可以提高OpenCV solvePnP算法的准确性
+    # fixed_step = min(width, length) / 10  # 使用较小尺寸的1/10作为固定步长
+    fixed_step = 0.1
     
-    width_base = -width / 2
-    length_base = -length / 2
+    # 计算棋盘格的边界范围
+    width_range = fixed_step * 6  # 6个间隔
+    length_range = fixed_step * 7  # 7个间隔
+    
+    # 计算基准点（左上角）
+    width_base = -width_range / 2
+    length_base = -length_range / 2
     
     points = []
     
-    # 生成棋盘格点 (6行 x 7列)
+    # 生成棋盘格点 (6行 x 7列)，使用均匀分布的固定步长
     for i in range(1, 7):
         for j in range(1, 8):
             # 创建局部坐标的初始点 (在xy平面)
             local_point = [0, 0, 0]
-            local_point[["x", "y", "z"].index(width_axis)] = width_base + i * width_step
-            local_point[["x", "y", "z"].index(length_axis)] = length_base + j * length_step
+            local_point[["x", "y", "z"].index(width_axis)] = width_base + i * fixed_step
+            local_point[["x", "y", "z"].index(length_axis)] = length_base + j * fixed_step
             
             points.append(local_point)
             

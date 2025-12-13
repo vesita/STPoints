@@ -111,10 +111,6 @@ def main():
         print(f"2D点坐标范围 - U:{np.min(image_points[:,0]):.3f}~{np.max(image_points[:,0]):.3f}, "
                 f"V:{np.min(image_points[:,1]):.3f}~{np.max(image_points[:,1]):.3f}")
         
-        # 确保有足够的点进行solvePnP (至少4个点)
-        if len(object_points) < 4 or len(image_points) < 4:
-            print(f"点数不足，需要至少4个点，当前3D点数: {len(object_points)}, 2D点数: {len(image_points)}")
-            return
             
         # 确保内参矩阵已定义
         camera_matrix = np.array(cam.intrinsic, dtype=np.float32)
@@ -122,9 +118,6 @@ def main():
         
         # 使用从配置文件加载的畸变系数，确保正确的形状
         dist_coeffs = np.array(cam.distortion_coefficients, dtype=np.float32).reshape(1, -1)
-        
-        best_result = None
-        best_error = float('inf')
         
         success, rvec, tvec = cv2.solvePnP(
             object_points, 
@@ -146,9 +139,6 @@ def main():
             
             # 检查旋转矩阵的正交性
             rotation_matrix, _ = cv2.Rodrigues(rvec)
-            print("\n旋转矩阵正交性检查:", end=" ")
-            identity_check = np.allclose(rotation_matrix @ rotation_matrix.T, np.eye(3))
-            determinant_check = np.allclose(np.linalg.det(rotation_matrix), 1.0)
             
             # 构造4x4的变换矩阵（从LiDAR坐标系到相机坐标系）
             extrinsic_matrix = np.eye(4, dtype=np.float32)

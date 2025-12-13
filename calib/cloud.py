@@ -124,6 +124,9 @@ def corner_caliboard(position, rotation, scale):
     length = scale[length_axis]
     width = scale[width_axis]
     
+    length = 0.1 * 9
+    width = 0.1 * 8
+    
     # 计算棋盘格步长
     width_step = width / (6 + 2)
     length_step = length / (7 + 2)
