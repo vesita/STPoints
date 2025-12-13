@@ -12,8 +12,8 @@ import copy
     然后需要通过标定，分别计算data/extr和data/ann对应的外参矩阵
     （这里的外参矩阵不需要保存）
     然后分别交叉验证(使用从一帧计算出的外参矩阵验证到另一帧上)
-    data/extr -> data/ann && data/va
-    data/ann -> data/extr && data/ va
+    data/d1 -> data/d2 && data/d3
+    data/d2 -> data/d1 && data/d3
     验证误差应该是小于10才是对的，哪怕误差突然下降，也不能说明最终结果是正确的，
     误差数值小于10是硬标准。
 
@@ -350,16 +350,16 @@ def main():
     """
     实现多数据集评估：
     1. 从config.json中读取相机内参、畸变系数和激光雷达外参矩阵
-    2. 分别计算data/extr和data/ann对应的外参矩阵
+    2. 分别计算data/d1和data/d2对应的外参矩阵
     3. 交叉验证(使用从一帧计算出的外参矩阵验证到另一帧上)
     """
     print("开始多数据集标定评估...")
     
     # 定义数据集路径
     datasets = {
-        'extr': 'data/extr',
-        'ann': 'data/ann',
-        'va': 'data/va'
+        'd1': 'data/d1',
+        'd2': 'data/d2',
+        'd3': 'data/d3'
     }
     
     # 检查数据集是否存在
