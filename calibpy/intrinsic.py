@@ -18,7 +18,7 @@ except ImportError:
 
 
 class IntrinsicCalibrator:
-    def __init__(self, inside_corner_size=(6, 7), square_size=0.1):
+    def __init__(self, inside_corner_size=(6, 7), square_size=100):
         """
         初始化内参标定器
         
@@ -261,7 +261,7 @@ class IntrinsicCalibrator:
         
         return resized_original, undistorted_img
 
-    def save_evaluation_result(self, original_img, undistorted_img, output_dir="eval_result"):
+    def save_evaluation_result(self, original_img, undistorted_img, output_dir="temp/eval_result"):
         """
         保存评估结果
         
@@ -297,7 +297,7 @@ def main():
     print("开始相机内参标定...")
     
     # 初始化标定器
-    calibrator = IntrinsicCalibrator(inside_corner_size=(6, 7), square_size=0.1)  # 默认10cm方格
+    calibrator = IntrinsicCalibrator()
     
     # 查找标定图像
     calibration_images_path = "data/calib/camera/image"

@@ -101,14 +101,23 @@ class Lidar:
         return self.to_world(corner_board)
     
     def to_world(self, points):
-        rot = self.extrinsic[:3, :3]
-        result = []
-        for point in points:
-            rotated_point = np.dot(rot.T, point)
-            # point = [-point[1], -point[2], point[0]]
-            # result.append(point)
-            result.append(rotated_point)
-        return np.array(result)
+        # rot = self.extrinsic[:3, :3]
+        # result = []
+        # for point in points:
+        #     rotated_point = np.dot(rot.T, point)
+        #     # point = [-point[1], -point[2], point[0]]
+        #     # result.append(point)
+        #     result.append(rotated_point)
+        # result = [[point[0], -point[1], -point[2]] for point in points]
+        # return np.array(result)
+        points_homo = np.hstack([points, np.ones((points.shape[0], 1))])
+        
+        # 应用LiDAR外参变换：LiDAR -> 世界
+        points_world_homo = (self.extrinsic @ points_homo.T).T
+        
+        # 返回非齐次坐标
+        return points_world_homo[:, :3]
+
     
 def corner_caliboard(position, rotation, scale):
     

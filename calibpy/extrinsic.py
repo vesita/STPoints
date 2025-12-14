@@ -6,11 +6,9 @@ import shutil
 from datetime import datetime
 
 try:
-    import fast_config
     import camera
     import lidar
 except:
-    import calibpy.fast_config as fast_config
     import calibpy.camera as camera
     import calibpy.lidar as lidar
 
@@ -99,17 +97,14 @@ def main():
     
     # 确保点的数量相同
     if len(caliboard3D) == len(caliboard2D):
-        # 转换为numpy数组
-        object_points = np.array(caliboard3D, dtype=np.float32)
-        image_points = np.array(caliboard2D, dtype=np.float32)
 
         # 验证坐标范围
         print("\n坐标范围验证:")
-        print(f"3D点坐标范围 - X:{np.min(object_points[:,0]):.3f}~{np.max(object_points[:,0]):.3f}, "
-                f"Y:{np.min(object_points[:,1]):.3f}~{np.max(object_points[:,1]):.3f}, "
-                f"Z:{np.min(object_points[:,2]):.3f}~{np.max(object_points[:,2]):.3f}")
-        print(f"2D点坐标范围 - U:{np.min(image_points[:,0]):.3f}~{np.max(image_points[:,0]):.3f}, "
-                f"V:{np.min(image_points[:,1]):.3f}~{np.max(image_points[:,1]):.3f}")
+        print(f"3D点坐标范围 - X:{np.min(caliboard3D[:,0]):.3f}~{np.max(caliboard3D[:,0]):.3f}, "
+                f"Y:{np.min(caliboard3D[:,1]):.3f}~{np.max(caliboard3D[:,1]):.3f}, "
+                f"Z:{np.min(caliboard3D[:,2]):.3f}~{np.max(caliboard3D[:,2]):.3f}")
+        print(f"2D点坐标范围 - U:{np.min(caliboard2D[:,0]):.3f}~{np.max(caliboard2D[:,0]):.3f}, "
+                f"V:{np.min(caliboard2D[:,1]):.3f}~{np.max(caliboard2D[:,1]):.3f}")
         
             
         # 确保内参矩阵已定义
@@ -120,8 +115,8 @@ def main():
         dist_coeffs = np.array(cam.distortion_coefficients, dtype=np.float32).reshape(1, -1)
         
         success, rvec, tvec = cv2.solvePnP(
-            object_points, 
-            image_points, 
+            caliboard3D, 
+            caliboard2D, 
             camera_matrix, 
             dist_coeffs,
             flags=cv2.SOLVEPNP_ITERATIVE
@@ -130,10 +125,10 @@ def main():
         if success:
             # 计算重投影误差
             projected_points, _ = cv2.projectPoints(
-                object_points, rvec, tvec, camera_matrix, dist_coeffs)
+                caliboard3D, rvec, tvec, camera_matrix, dist_coeffs)
             
             projected_points = projected_points.reshape(-1, 2)
-            reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
+            reprojection_error = np.sqrt(np.mean((caliboard2D - projected_points) ** 2))
             
             print(f"  方法 pnp 重投影误差: {reprojection_error:.2f} 像素")
             
@@ -143,7 +138,7 @@ def main():
             # 构造4x4的变换矩阵（从LiDAR坐标系到相机坐标系）
             extrinsic_matrix = np.eye(4, dtype=np.float32)
             extrinsic_matrix[:3, :3] = rotation_matrix
-            extrinsic_matrix[:3, 3] = tvec.flatten()
+            extrinsic_matrix[:3, 3] = tvec.reshape(-1)
             
             print("\n外参矩阵详细信息 (LiDAR到相机):")
             print("旋转矩阵 R:")
@@ -160,11 +155,11 @@ def main():
             
             # 计算重投影误差
             projected_points, _ = cv2.projectPoints(
-                object_points, rvec, tvec, camera_matrix, dist_coeffs)
+                caliboard3D, rvec, tvec, camera_matrix, dist_coeffs)
             
             # 计算均方根误差
             projected_points = projected_points.reshape(-1, 2)
-            reprojection_error = np.sqrt(np.mean((image_points - projected_points) ** 2))
+            reprojection_error = np.sqrt(np.mean((caliboard2D - projected_points) ** 2))
             
             print(f"最终重投影误差: {reprojection_error} 像素")
             
