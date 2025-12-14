@@ -85,7 +85,7 @@ class IntrinsicCalibrator:
         success, corners = self.detect_chessboard_corners(image_path)
         if success:
             self.image_points_list.append(corners)
-            self.object_points_list.append(self.object_points.copy())  # 使用copy避免引用问题
+            self.object_points_list.append(self.object_points)
             self.valid_images.append(image_path)
             return True
         else:
@@ -198,6 +198,97 @@ class IntrinsicCalibrator:
             
         print(f"标定结果已保存到 {output_path}")
 
+    def evaluate_intrinsic_effect(self, image_path=None, camera_matrix=None, dist_coeffs=None):
+        """
+        评估内参标定效果
+        
+        Args:
+            image_path: 图像路径，如果为None则随机选择一张用于标定的图像
+            camera_matrix: 相机内参矩阵，如果为None则使用类中存储的结果
+            dist_coeffs: 畸变系数，如果为None则使用类中存储的结果
+            
+        Returns:
+            tuple: (原始图像, 矫正后的图像)
+        """
+        import random
+        
+        # 如果没有提供图像路径，则随机选择一张用于标定的图像
+        if image_path is None:
+            if not self.valid_images:
+                raise ValueError("没有可用的图像用于评估，请先添加标定图像")
+            image_path = random.choice(self.valid_images)
+            print(f"随机选择图像: {image_path}")
+        else:
+            print(f"使用指定图像: {image_path}")
+            
+        # 读取图像
+        img = cv2.imread(image_path)
+        if img is None:
+            raise ValueError(f"无法读取图像: {image_path}")
+            
+        # 获取图像尺寸
+        h, w = img.shape[:2]
+        image_size = (w, h)
+        
+        # 如果提供了相机矩阵和畸变系数，则使用它们；否则抛出错误
+        if camera_matrix is None or dist_coeffs is None:
+            raise ValueError("必须提供相机内参矩阵和畸变系数用于评估")
+            
+        # 将相机矩阵和畸变系数转换为正确形状
+        camera_matrix = np.array(camera_matrix).reshape(3, 3)
+        dist_coeffs = np.array(dist_coeffs)
+        
+        # 计算优化的相机内参矩阵和ROI区域
+        new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(
+            camera_matrix, dist_coeffs, image_size, 1, image_size
+        )
+        
+        # 应用去畸变
+        undistorted_img = cv2.undistort(
+            img, camera_matrix, dist_coeffs, None, new_camera_matrix
+        )
+        
+        # 裁剪去畸变图像
+        x, y, w, h = roi
+        undistorted_img = undistorted_img[y:y+h, x:x+w]
+        
+        # 调整图像大小使其一致便于对比
+        resized_original = cv2.resize(img, (w, h))
+        
+        print(f"原图尺寸: {img.shape[1]}x{img.shape[0]}")
+        print(f"矫正后图像尺寸: {undistorted_img.shape[1]}x{undistorted_img.shape[0]}")
+        print("图像矫正完成，可以通过比较原图和矫正图来评估标定效果")
+        
+        return resized_original, undistorted_img
+
+    def save_evaluation_result(self, original_img, undistorted_img, output_dir="eval_result"):
+        """
+        保存评估结果
+        
+        Args:
+            original_img: 原始图像
+            undistorted_img: 矫正后的图像
+            output_dir: 输出目录
+        """
+        # 创建输出目录
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 保存原始图像
+        original_path = os.path.join(output_dir, "original.jpg")
+        cv2.imwrite(original_path, original_img)
+        print(f"原始图像已保存到: {original_path}")
+        
+        # 保存矫正后的图像
+        undistorted_path = os.path.join(output_dir, "undistorted.jpg")
+        cv2.imwrite(undistorted_path, undistorted_img)
+        print(f"矫正图像已保存到: {undistorted_path}")
+        
+        # 拼接两张图像进行对比
+        comparison = np.hstack((original_img, undistorted_img))
+        comparison_path = os.path.join(output_dir, "comparison.jpg")
+        cv2.imwrite(comparison_path, comparison)
+        print(f"对比图像已保存到: {comparison_path}")
+
 
 def main():
     """
@@ -209,7 +300,7 @@ def main():
     calibrator = IntrinsicCalibrator(inside_corner_size=(6, 7), square_size=0.1)  # 默认10cm方格
     
     # 查找标定图像
-    calibration_images_path = "data/calibration/camera/image"
+    calibration_images_path = "data/calib/camera/image"
     
     # 查找目录中的图像文件
     image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp']
@@ -246,6 +337,24 @@ def main():
         # 保存结果
         output_path = "config/calibrated_config.json"
         calibrator.save_calibration(result, output_path)
+        
+        # 评估标定效果
+        print("\n开始评估内参标定效果...")
+        camera_matrix = np.array(result['camera_matrix']).reshape(3, 3)
+        dist_coeffs = np.array(result['distortion_coefficients'])
+        
+        try:
+            original_img, undistorted_img = calibrator.evaluate_intrinsic_effect(
+                camera_matrix=camera_matrix,
+                dist_coeffs=dist_coeffs
+            )
+            
+            # 保存评估结果
+            calibrator.save_evaluation_result(original_img, undistorted_img)
+            print("内参标定效果评估完成!")
+        except Exception as e:
+            print(f"评估过程中出现错误: {e}")
+        
         print("相机内参标定完成!")
     else:
         print("相机内参标定失败!")

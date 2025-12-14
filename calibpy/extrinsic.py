@@ -168,18 +168,13 @@ def main():
             
             print(f"最终重投影误差: {reprojection_error} 像素")
             
-            # 询问用户是否保存标定结果
-            save_choice = input("是否将标定结果保存并覆盖相机外参？(y/N): ")
-            if save_choice.lower() in ['y', 'yes']:
-                # 先备份配置文件
-                print("正在备份当前配置文件...")
-                if backup_config():
-                    # 保存外参矩阵到配置文件
-                    save_camera_extrinsic(extrinsic_matrix)
-                else:
-                    print("备份失败，取消保存操作")
+            # 先备份配置文件
+            print("正在备份当前配置文件...")
+            if backup_config():
+                # 保存外参矩阵到配置文件
+                save_camera_extrinsic(extrinsic_matrix)
             else:
-                print("未保存相机外参")
+                print("备份失败，取消保存操作")
 
 
 if __name__ == "__main__":

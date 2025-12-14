@@ -63,7 +63,7 @@ class CalibrationVisualizer:
         # 使用cv2.projectPoints进行投影
         projected_points, _ = cv2.projectPoints(
             np.array(points, dtype=np.float32), 
-            rvec, tvec, 
+            rvec.T, tvec, 
             camera_matrix.astype(np.float32), 
             dist_coeffs.astype(np.float32)
         )
