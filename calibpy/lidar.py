@@ -1,6 +1,9 @@
 import json
 import open3d as o3d
 import numpy as np
+import sklearn as sk
+
+import utils.draw_box as draw
 
 try:
     from calibpy.fast_config import get_config
@@ -9,7 +12,7 @@ except:
     from fast_config import get_config
     from utils.rotation import rotation_matrix
 
-
+from rdsend.client import ClientSender
 class BoundingBox:
     def __init__(self):
         self.position = {"x": 0, "y": 0, "z": 0}
@@ -23,6 +26,9 @@ class BoundingBox:
         self.position = psr["position"]
         self.rotation = psr["rotation"]
         self.scale = psr["scale"]
+
+    def corners(self):
+        return box_corners(self.position, self.scale, self.rotation)
 
     def inside(self, point):
         """
@@ -88,7 +94,12 @@ class Lidar:
         print(f"LiDAR点云点数: {len(self.cloud)}")
         
     def target_cloud_self(self):
-        return [point for point in self.cloud if self.bounding_box.inside(point)]
+        sender = ClientSender()
+        sender.connect()
+        points = [point for point in self.cloud if self.bounding_box.inside(point)]
+        for point in points:
+            sender.send_point(point[0], -point[2], -point[1])
+        return points
     
     def target_cloud(self):
         """
@@ -103,19 +114,84 @@ class Lidar:
         获取LiDAR坐标系中的棋盘格角点，不进行额外的坐标变换
         注意：此方法直接返回LiDAR坐标系中的点，坐标变换将在后续处理中进行
         """
-        cloud = self.target_cloud_self()
-        print(f"LiDAR目标点云数量: {len(cloud)}")
         
-        box = min_box(cloud)
+        sender = ClientSender()
+        sender.connect()
+        
+        # cloud = self.target_cloud_self()
+        # print(f"LiDAR目标点云数量: {len(cloud)}")
+        
+        # # 创建一个Open3D点云对象并计算定向包围盒
+        # pcd = o3d.geometry.PointCloud()
+        # pcd.points = o3d.utility.Vector3dVector(cloud)
+        # obb = pcd.get_oriented_bounding_box()
+        
+        # # 提取包围盒参数
+        # center = obb.get_center()
+        # extent = obb.extent  # XYZ三个方向的尺寸
+        # rotation_matrix = obb.R  # 3x3旋转矩阵
+        
+        
+        # corners = np.array([
+        #     [extent[0] / 2, extent[1] / 2, extent[2] / 2],
+        #     [extent[0] / 2, extent[1] / 2, -extent[2] / 2],
+        #     [extent[0] / 2, -extent[1] / 2, extent[2] / 2],
+        #     [extent[0] / 2, -extent[1] / 2, -extent[2] / 2],
+        #     [-extent[0] / 2, extent[1] / 2, extent[2] / 2],
+        #     [-extent[0] / 2, extent[1] / 2, -extent[2] / 2],
+        #     [-extent[0] / 2, -extent[1] / 2, extent[2] / 2],
+        #     [-extent[0] / 2, -extent[1] / 2, -extent[2] / 2]
+        # ])
+        
+        # corners = [(rotation_matrix @ point.T).T for point in corners]
+        # corners = [point + center for point in corners]
+        
+        # index = draw.edges()
+        
+        # for idx in index:
+        #     start = [corners[idx[0]][0], -corners[idx[0]][1], -corners[idx[0]][2]]
+        #     end = [corners[idx[1]][0], -corners[idx[1]][1], -corners[idx[1]][2]]
+        #     sender.send_segment(start, end)
+        
+        # # 将旋转矩阵转换为欧拉角
+        # rotation = rotation_matrix_to_euler_angles(rotation_matrix)
+        
+        # # 构建包围盒参数字典
+        # box = {
+        #     'position': {"x": center[0], "y": center[1], "z": center[2]},
+        #     'scale': {"x": extent[0], "y": extent[1], "z": extent[2]},
+        #     'rotation': rotation
+        # }
+        
+        # # 使用原来的min_box函数（基于PCA）
+        # box = min_box(cloud)
+        
         # 使用cloud.py中的逻辑计算包围盒角点
-        corners = box_corners(box["position"], box["rotation"], box["scale"])
-        print(f"包围盒8个角点: {corners}")
+        # corners = box_corners(box["position"], box["scale"], box["rotation"])
         
-        corner_board = corner_caliboard(box["position"], box["rotation"], box["scale"])
-        print(f"棋盘格角点数量: {len(corner_board)}")
+        
+        # print(f"包围盒8个角点: {corners}")
+        # sender = ClientSender()
+        # sender.connect()
+        
+        # index = draw.edges()
+        
+        # for idx in index:
+        #     start = [corners[idx[0]][0], -corners[idx[0]][1], -corners[idx[0]][2]]
+        #     end = [corners[idx[1]][0], -corners[idx[1]][1], -corners[idx[1]][2]]
+        #     sender.send_segment(start, end)
+        
+        # corner_board = corner_caliboard(box["position"], box["rotation"], box["scale"])
+        # print(f"棋盘格角点数量: {len(corner_board)}")
+        
+        corners = self.bounding_box.corners()
+        corner_board = corner_caliboard(self.bounding_box.position, self.bounding_box.rotation, self.bounding_box.scale)
+        
+        # for point in corner_board:
+        #     sender.send_point(point[0], -point[2], -point[1])
         
         return corner_board
-        return self.to_world(corner_board)
+        # return self.to_world(corner_board)
     
     def to_world(self, points):
         # rot = self.extrinsic[:3, :3]
@@ -197,7 +273,7 @@ def corner_caliboard(position, rotation, scale):
     # 返回numpy数组而不是普通列表
     return np.array(result)
 
-def box_corners(position, rotation, scale):
+def box_corners(position, scale, rotation):
     original = [[-scale["x"] / 2, -scale["y"] / 2, -scale["z"] / 2],
                 [scale["x"] / 2, -scale["y"] / 2, -scale["z"] / 2],
                 [scale["x"] / 2, -scale["y"] / 2, scale["z"] / 2],
@@ -304,4 +380,6 @@ def rotation_matrix_to_euler_angles(R):
         z = 0
         
     return {"x": x, "y": y, "z": z}
+
+
 

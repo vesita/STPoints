@@ -93,26 +93,28 @@ def main():
     cam = camera.Camera()
     lid = lidar.Lidar()
     
-    cloud = lid.cloud
+    # cloud = lid.cloud
     # cloud = [(lid.extrinsic @ np.append(point, 1))[:3] for point in cloud]
-    for point in cloud:
-        client.send_point(point[0], point[1], point[2])
+    # for point in cloud:
+    #     client.send_point(point[0], point[2], point[1])
     
     corners = draw.corners_of_psr(lid.bounding_box.position, lid.bounding_box.scale, lid.bounding_box.rotation)
     index = draw.edges()
     
     
+    corners = [(lid.extrinsic @ np.append(point, 1))[:3] for point in corners]
+    
     for idx in index:
-        start = [corners[idx[0]][0], corners[idx[0]][1], corners[idx[0]][2]]
-        end = [corners[idx[1]][0], corners[idx[1]][1], corners[idx[1]][2]]
+        start = [corners[idx[0]][0], corners[idx[0]][2], corners[idx[0]][1]]
+        end = [corners[idx[1]][0], corners[idx[1]][2], corners[idx[1]][1]]
         client.send_segment(start, end)
     
     print("获取LiDAR生成的棋盘格3D点...")
     caliboard3D = lid.target_corners()
     
-    # caliboard3D = [(lid.extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
-    # for point in caliboard3D:
-    #     client.send_point(point[0], point[2], point[1])
+    caliboard3D = [(lid.extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
+    for point in caliboard3D:
+        client.send_point(point[0], point[2], point[1])
     
     print("获取图像中的棋盘格2D点...")
     caliboard2D = cam.get_caliboard()
@@ -120,16 +122,22 @@ def main():
     print(f"3D点数量: {len(caliboard3D) if caliboard3D is not None else 'None'}")
     print(f"2D点数量: {len(caliboard2D) if caliboard2D is not None else 'None'}")
     
+    for point in caliboard2D:
+        client.send_point(1, point[0]/640, point[1]/480)
+    
     # 确保点的数量相同
     if len(caliboard3D) == len(caliboard2D):
-
-        # 验证坐标范围
-        print("\n坐标范围验证:")
-        print(f"3D点坐标范围 - X:{np.min(caliboard3D[:,0]):.3f}~{np.max(caliboard3D[:,0]):.3f}, "
-                f"Y:{np.min(caliboard3D[:,1]):.3f}~{np.max(caliboard3D[:,1]):.3f}, "
-                f"Z:{np.min(caliboard3D[:,2]):.3f}~{np.max(caliboard3D[:,2]):.3f}")
-        print(f"2D点坐标范围 - U:{np.min(caliboard2D[:,0]):.3f}~{np.max(caliboard2D[:,0]):.3f}, "
-                f"V:{np.min(caliboard2D[:,1]):.3f}~{np.max(caliboard2D[:,1]):.3f}")
+        # 将列表转换为 numpy 数组以供 OpenCV 使用
+        caliboard3D = np.array(caliboard3D, dtype=np.float32)
+        caliboard2D = np.array(caliboard2D, dtype=np.float32)
+        
+        # # 验证坐标范围
+        # print("\n坐标范围验证:")
+        # print(f"3D点坐标范围 - X:{np.min(caliboard3D[:,0]):.3f}~{np.max(caliboard3D[:,0]):.3f}, "
+        #         f"Y:{np.min(caliboard3D[:,1]):.3f}~{np.max(caliboard3D[:,1]):.3f}, "
+        #         f"Z:{np.min(caliboard3D[:,2]):.3f}~{np.max(caliboard3D[:,2]):.3f}")
+        # print(f"2D点坐标范围 - U:{np.min(caliboard2D[:,0]):.3f}~{np.max(caliboard2D[:,0]):.3f}, "
+        #         f"V:{np.min(caliboard2D[:,1]):.3f}~{np.max(caliboard2D[:,1]):.3f}")
         
             
         # 确保内参矩阵已定义
