@@ -89,6 +89,7 @@ class CalibrationVisualizer:
         
         # 获取LiDAR坐标系中的标定板角点
         lidar_board_corners = self.lid.target_corners()
+        lidar_board_corners = [(self.lid.extrinsic @ np.append(point, 1))[:3] for point in lidar_board_corners]
         print(f"LiDAR棋盘格角点数量: {len(lidar_board_corners)}")
         
         # 获取相机内外参
@@ -103,7 +104,7 @@ class CalibrationVisualizer:
         print(f"平移向量 (tvec):\n{tvec}")
         
         lidar_projected_corners, _ = cv2.projectPoints(
-            lidar_board_corners.astype(np.float32), 
+            np.array(lidar_board_corners, dtype=np.float32), 
             rvec, tvec, 
             camera_matrix.astype(np.float32), 
             dist_coeffs.astype(np.float32)
@@ -116,6 +117,14 @@ class CalibrationVisualizer:
         
         print(f"LiDAR投影角点数量: {len(lidar_projected_corners)}")
         print(f"图像检测角点数量: {len(image_corners)}")
+        
+        # 确保点的数量相同
+        if len(lidar_projected_corners) != len(image_corners):
+            print(f"警告: LiDAR投影角点数量({len(lidar_projected_corners)})与图像检测角点数量({len(image_corners)})不匹配")
+            # 选择较小的数量进行比较
+            min_len = min(len(lidar_projected_corners), len(image_corners))
+            lidar_projected_corners = lidar_projected_corners[:min_len]
+            image_corners = image_corners[:min_len]
         
         # 绘制LiDAR投影的角点（红色）
         for i, point in enumerate(lidar_projected_corners):
@@ -135,12 +144,15 @@ class CalibrationVisualizer:
                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 0, 0), 1)
         
         
-        # 使用欧氏距离的均方根作为重投影误差
-        reprojection_error = np.sqrt(np.mean((image_corners - lidar_projected_corners) ** 2))
+        # 计算重投影误差，确保只有在有数据时才计算
+        reprojection_error = float('inf')
+        if len(image_corners) > 0 and len(lidar_projected_corners) > 0:
+            # 使用欧氏距离的均方根作为重投影误差
+            reprojection_error = np.sqrt(np.mean((image_corners - lidar_projected_corners) ** 2))
         
         print(f"重投影误差统计:")
         print(f"  平均误差: {reprojection_error:.2f} 像素")
-        print(f"  使用点数: {image_corners.shape[0]}")
+        print(f"  使用点数: {len(image_corners)}")
         
         # 在图像上显示误差信息
         cv2.putText(image_cv, f'重投影误差: {reprojection_error:.2f} 像素', 

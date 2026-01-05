@@ -113,8 +113,6 @@ def main():
     caliboard3D = lid.target_corners()
     
     caliboard3D = [(lid.extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
-    for point in caliboard3D:
-        client.send_point(point[0], point[2], point[1])
     
     print("获取图像中的棋盘格2D点...")
     caliboard2D = cam.get_caliboard()
@@ -122,23 +120,11 @@ def main():
     print(f"3D点数量: {len(caliboard3D) if caliboard3D is not None else 'None'}")
     print(f"2D点数量: {len(caliboard2D) if caliboard2D is not None else 'None'}")
     
-    for point in caliboard2D:
-        client.send_point(1, point[0]/640, point[1]/480)
-    
     # 确保点的数量相同
     if len(caliboard3D) == len(caliboard2D):
         # 将列表转换为 numpy 数组以供 OpenCV 使用
         caliboard3D = np.array(caliboard3D, dtype=np.float32)
-        caliboard2D = np.array(caliboard2D, dtype=np.float32)
-        
-        # # 验证坐标范围
-        # print("\n坐标范围验证:")
-        # print(f"3D点坐标范围 - X:{np.min(caliboard3D[:,0]):.3f}~{np.max(caliboard3D[:,0]):.3f}, "
-        #         f"Y:{np.min(caliboard3D[:,1]):.3f}~{np.max(caliboard3D[:,1]):.3f}, "
-        #         f"Z:{np.min(caliboard3D[:,2]):.3f}~{np.max(caliboard3D[:,2]):.3f}")
-        # print(f"2D点坐标范围 - U:{np.min(caliboard2D[:,0]):.3f}~{np.max(caliboard2D[:,0]):.3f}, "
-        #         f"V:{np.min(caliboard2D[:,1]):.3f}~{np.max(caliboard2D[:,1]):.3f}")
-        
+        caliboard2D = np.array(caliboard2D, dtype=np.float32)        
             
         # 确保内参矩阵已定义
         camera_matrix = np.array(cam.intrinsic, dtype=np.float32)
@@ -146,6 +132,24 @@ def main():
         
         # 使用从配置文件加载的畸变系数，确保正确的形状
         dist_coeffs = np.array(cam.distortion_coefficients, dtype=np.float32).reshape(1, -1)
+        
+        # for point in caliboard3D:
+        #     client.send_point(point[0], point[2], point[1])
+        
+        # for point in caliboard2D:
+        #     client.send_point(1, -point[1]/100, -point[0]/100)
+        
+        # caliboard2D.sort()
+        # # 使用 numpy 的随机排列功能替代 shuffle 方法
+        # indices = np.random.permutation(caliboard3D.shape[0])
+        # caliboard3D = caliboard3D[indices]
+        
+        # 对于NumPy数组，使用argsort来实现类似key的排序
+        sort_indices_2d = np.argsort(-1024 * caliboard2D[:, 0] - caliboard2D[:, 1])
+        caliboard2D = caliboard2D[sort_indices_2d]
+        
+        sort_indices_3d = np.argsort(1024 * caliboard3D[:, 1] + caliboard3D[:, 2])
+        caliboard3D = caliboard3D[sort_indices_3d]
         
         success, rvec, tvec = cv2.solvePnP(
             caliboard3D, 
@@ -161,6 +165,8 @@ def main():
                 caliboard3D, rvec, tvec, camera_matrix, dist_coeffs)
             
             projected_points = projected_points.reshape(-1, 2)
+            for point in projected_points:
+                client.send_point(1, -point[0]/100, -point[1]/100)
             reprojection_error = np.sqrt(np.mean((caliboard2D - projected_points) ** 2))
             
             print(f"  方法 pnp 重投影误差: {reprojection_error:.2f} 像素")
@@ -204,6 +210,11 @@ def main():
             else:
                 print("备份失败，取消保存操作")
 
+        # # 将2D点转换为齐次坐标后再进行矩阵运算
+        # img_caliboard3D = [np.linalg.inv(cam.intrinsic) @ np.append(point, 1) for point in caliboard2D]
+        # img_caliboard3D = [[1, point[0], point[1]] for point in img_caliboard3D]
+        
+        
 
 if __name__ == "__main__":
     main()

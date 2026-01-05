@@ -219,8 +219,15 @@ def corner_caliboard(position, rotation, scale):
     rot_y = np.array([[cos_y, 0, sin_y], [0, 1, 0], [-sin_y, 0, cos_y]])
     rot_x = np.array([[1, 0, 0], [0, cos_x, -sin_x], [0, sin_x, cos_x]])
 
-    # 组合旋转矩阵 (R = Rz * Ry * Rx)
+    # 组合旋转矩阵 (R = Rx * Ry * Rz)
     rotation_matrix = np.dot(rot_x, np.dot(rot_y, rot_z))
+    
+    transform = np.array([
+        [rotation_matrix[0][0], rotation_matrix[0][1], rotation_matrix[0][2], position["x"]],
+        [rotation_matrix[1][0], rotation_matrix[1][1], rotation_matrix[1][2], position["y"]],
+        [rotation_matrix[2][0], rotation_matrix[2][1], rotation_matrix[2][2], position["z"]],
+        [0, 0, 0, 1]
+    ])
     
     # 根据实际的x、y、z轴尺寸确定棋盘格方向，而不是简单的排序
     # 找到最长和次长的轴
@@ -260,15 +267,13 @@ def corner_caliboard(position, rotation, scale):
             
             points.append(local_point)
             
-    result = []
+    result = [(transform @ np.append(point, 1).T)[:3] for point in points]
     
-    # 应用旋转和平移到每个点
-    for point in points:
-        rotated_point = np.dot(rotation_matrix, point)
-        rotated_point[0] += position["x"]
-        rotated_point[1] += position["y"]
-        rotated_point[2] += position["z"]
-        result.append(rotated_point)
+    # sender = ClientSender()
+    # sender.connect()
+
+    # for point in result:
+    #     sender.send_point(point[0], -point[2], -point[1])
     
     # 返回numpy数组而不是普通列表
     return np.array(result)
