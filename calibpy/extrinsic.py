@@ -112,7 +112,7 @@ def main():
     print("获取LiDAR生成的棋盘格3D点...")
     caliboard3D = lid.target_corners()
     
-    caliboard3D = [(lid.extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
+    # caliboard3D = [(lid.extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
     
     print("获取图像中的棋盘格2D点...")
     caliboard2D = cam.get_caliboard()
