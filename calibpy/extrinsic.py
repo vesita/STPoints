@@ -112,7 +112,7 @@ def main():
     print("获取LiDAR生成的棋盘格3D点...")
     caliboard3D = lid.target_corners()
     
-    # caliboard3D = [(lid.extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
+    caliboard3D = [(lid.extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
     
     print("获取图像中的棋盘格2D点...")
     caliboard2D = cam.get_caliboard()
@@ -145,11 +145,38 @@ def main():
         # caliboard3D = caliboard3D[indices]
         
         # 对于NumPy数组，使用argsort来实现类似key的排序
-        sort_indices_2d = np.argsort(-1024 * caliboard2D[:, 0] - caliboard2D[:, 1])
+        sort_indices_2d = np.argsort(1024 * caliboard2D[:, 0] + caliboard2D[:, 1])
         caliboard2D = caliboard2D[sort_indices_2d]
         
-        sort_indices_3d = np.argsort(1024 * caliboard3D[:, 1] + caliboard3D[:, 2])
+        for point in caliboard2D:
+            print(point)
+        
+        sort_indices_3d = np.argsort(-1024 * caliboard3D[:, 1] - caliboard3D[:, 2])
         caliboard3D = caliboard3D[sort_indices_3d]
+        
+        for point in caliboard3D:
+            print(point)
+            
+        caliboard3D = np.array([
+            [3.5889852, -0.38507494, -0.34156674],
+            [3.5668185, 0.21403857, -0.31765765],
+            [3.477577, -0.36975443, -0.82875615],
+            [3.4554105, 0.22935908, -0.80484706]
+        ])
+        
+        # caliboard3D = np.array([
+        #     [3.4554105, 0.22935908, -0.80484706],
+        #     [3.477577, -0.36975443, -0.82875615],
+        #     [3.5668185, 0.21403857, -0.31765765],
+        #     [3.5889852, -0.38507494, -0.34156674]
+        # ])
+        
+        caliboard2D = np.array([
+            [317.62103, 277.33878],
+            [411.76627, 275.93457],
+            [317.63156, 199.48656],
+            [410.19217, 199.42244]
+        ])
         
         success, rvec, tvec = cv2.solvePnP(
             caliboard3D, 
