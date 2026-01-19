@@ -364,6 +364,160 @@ def compute_extrinsics_with_coordinate_method(caliboard3D, caliboard2D, camera_m
         return None
 
 
+def evaluate_extrinsic_for_test_dirs(extrinsic_matrix, test_base_path="test"):
+    """
+    遍历test目录下的所有子目录，使用给定的外参矩阵将标定板投影到图像上并评估投影效果
+    """
+    print(f"开始评估 {test_base_path} 目录下所有子目录的外参投影效果...")
+    
+    print("使用的外参矩阵:")
+    print(extrinsic_matrix)
+    
+    # 获取test目录下的所有子目录
+    subdirs = [d for d in os.listdir(test_base_path) 
+               if os.path.isdir(os.path.join(test_base_path, d))]
+    
+    all_errors = []
+    
+    for subdir in sorted(subdirs):
+        subdir_path = os.path.join(test_base_path, subdir)
+        
+        # 检查必要的文件是否存在
+        cloud_file = os.path.join(subdir_path, "cloud.pcd")
+        image_file = os.path.join(subdir_path, "image.jpg")
+        label_file = os.path.join(subdir_path, "label.json")
+        
+        if not all(os.path.exists(f) for f in [cloud_file, image_file, label_file]):
+            print(f"跳过 {subdir_path}, 缺少必要文件")
+            continue
+        
+        print(f"\n处理 {subdir_path}...")
+        
+        try:
+            # 加载标签文件
+            with open(label_file, 'r') as f:
+                label_data = json.load(f)
+            
+            # 假设第一个对象是标定板
+            if len(label_data) == 0:
+                print(f"标签文件 {label_file} 为空")
+                continue
+                
+            # 获取标定板的PSR参数
+            bbox_data = label_data[0]["psr"]  
+            pos = bbox_data["position"]
+            scale = bbox_data["scale"]
+            rot = bbox_data["rotation"]
+            
+            # 从config.json加载外参矩阵
+            with open("./config/config.json", 'r') as f:
+                config_data = json.load(f)
+            lidar_extrinsic = np.array(config_data["lidar_extrinsic"]).reshape(4, 4)
+            
+            # 使用corner_caliboard函数生成42个棋盘格角点（类似lidar.py中的逻辑）
+            caliboard3D = lidar.corner_caliboard(pos, rot, scale)
+            
+            # 应用lidar外参变换到世界坐标系
+            caliboard3D_world = [(lidar_extrinsic @ np.append(point, 1))[:3] for point in caliboard3D]
+            caliboard3D_world = np.array(caliboard3D_world, dtype=np.float32)
+            
+            # 加载相机参数
+            camera_intrinsic = np.array(config_data["camera_intrinsic"]).reshape(3, 3)
+            camera_distortion = np.array(config_data["camera_distortion_coefficients"])
+            
+            # 加载图像并获取2D标定板点
+            from PIL import Image
+            img = Image.open(image_file)
+            img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+            
+            # 查找棋盘格角点
+            chessboard_size = (6, 7)  # 默认棋盘格大小
+            ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
+            
+            if not ret:
+                # 如果没找到角点，尝试其他尺寸
+                for size in [(5, 6), (7, 8), (8, 9), (9, 6)]:
+                    ret, corners = cv2.findChessboardCorners(gray, size, None)
+                    if ret:
+                        chessboard_size = size
+                        break
+            
+            if not ret:
+                print(f"在 {image_file} 中未找到棋盘格角点")
+                continue
+                
+            # 精细化角点位置
+            criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+            
+            # 将角点坐标从图像坐标转换为(x, y)坐标形式
+            caliboard2D = []
+            for corner in corners:
+                u, v = corner.ravel()
+                caliboard2D.append([u, v])
+                
+            caliboard2D = np.array(caliboard2D, dtype=np.float32)
+
+            print(f"3D点数量: {len(caliboard3D_world)}, 2D点数量: {len(caliboard2D)}")
+
+            # 确保点的数量相同
+            if len(caliboard3D_world) != len(caliboard2D):
+                print(f"3D和2D点数量不匹配: {len(caliboard3D_world)} vs {len(caliboard2D)}")
+                # 尝试使用最小数量的点
+                min_len = min(len(caliboard3D_world), len(caliboard2D))
+                caliboard3D_world = caliboard3D_world[:min_len]
+                caliboard2D = caliboard2D[:min_len]
+                
+                if min_len < 4:
+                    print("点数太少，无法进行有效的投影评估")
+                    continue
+
+            # 使用给定外参矩阵将3D点投影到2D图像
+            dist_coeffs = camera_distortion.reshape(1, -1)
+
+            # 应用外参变换 (从LiDAR坐标系到相机坐标系)
+            transformed_3d = coordinate.apply_transform(caliboard3D_world, extrinsic_matrix)
+
+            # 将3D点投影到2D图像
+            projected_2d, _ = cv2.projectPoints(
+                transformed_3d.reshape(-1, 1, 3).astype(np.float32),
+                np.zeros(3), np.zeros(3),
+                camera_intrinsic.astype(np.float32),
+                dist_coeffs.astype(np.float32)
+            )
+            projected_2d = projected_2d.reshape(-1, 2)
+
+            # 计算投影误差
+            error = np.mean(np.sqrt(np.sum((projected_2d - caliboard2D)**2, axis=1)))
+            all_errors.append(error)
+
+            print(f"{subdir}: 平均投影误差 = {error:.4f} 像素")
+
+            # 输出前几个点的对比
+            print(f"  前3个点的对比 (投影点 vs 实际点):")
+            for i in range(min(3, len(projected_2d))):
+                print(f"    {i}: ({projected_2d[i][0]:.2f}, {projected_2d[i][1]:.2f}) vs "
+                      f"({caliboard2D[i][0]:.2f}, {caliboard2D[i][1]:.2f})")
+
+        except Exception as e:
+            print(f"处理 {subdir_path} 时出现错误: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            continue
+
+    # 输出总体统计
+    if all_errors:
+        print(f"\n总体评估结果:")
+        print(f"  总共处理了 {len(all_errors)} 个目录")
+        print(f"  平均投影误差: {np.mean(all_errors):.4f} 像素")
+        print(f"  最小投影误差: {np.min(all_errors):.4f} 像素")
+        print(f"  最大投影误差: {np.max(all_errors):.4f} 像素")
+        print(f"  投影误差标准差: {np.std(all_errors):.4f} 像素")
+    else:
+        print("没有成功处理任何目录")
+
+
 def main():
     # client = ClientSender()
     # client.connect()
@@ -540,12 +694,19 @@ def main():
         #     else:
         #         print("备份失败，取消保存操作")
 
-        # # 将2D点转换为齐次坐标后再进行矩阵运算
+        # 将2D点转换为齐次坐标后再进行矩阵运算
         # img_caliboard3D = [np.linalg.inv(cam.intrinsic) @ np.append(point, 1) for point in caliboard2D]
         # img_caliboard3D = [[1, point[0], point[1]] for point in img_caliboard3D]
         
         
         
+    # 添加对test目录下所有数据的评估，使用计算出的外参
+    if 'extrinsic_matrix_coord' in locals() and extrinsic_matrix_coord is not None:
+        print("\n开始评估test目录下所有数据的外参投影效果...")
+        evaluate_extrinsic_for_test_dirs(extrinsic_matrix_coord)
+    else:
+        print("\n没有有效的外参矩阵用于评估")
+
 
 if __name__ == "__main__":
     main()

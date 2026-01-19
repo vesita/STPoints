@@ -11,3 +11,5 @@ temp*/
 cache/
 config/backups/
 eval_images/
+
+test/
