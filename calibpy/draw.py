@@ -247,7 +247,7 @@ class CalibrationVisualizer:
         
         # 获取LiDAR坐标系中的标定板角点
         lidar_board_corners = self.lid.target_corners()
-        # lidar_board_corners = [(self.lid.extrinsic @ np.append(point, 1))[:3] for point in lidar_board_corners]
+        lidar_board_corners = [(self.lid.extrinsic @ np.append(point, 1))[:3] for point in lidar_board_corners]
         
         # targets = [
         #     (self.cam.intrinsic @ (self.cam.extrinsic @ np.append(point, 1))[:3])[:2] for point in lidar_board_corners
