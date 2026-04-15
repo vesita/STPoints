@@ -1,6 +1,7 @@
 
 import { logger } from './log.js';
 import * as tf from '@tensorflow/tfjs';
+import * as ort from 'onnxruntime-web';
 
 const annMath = {
 
@@ -222,27 +223,112 @@ const ml = {
     }
   },
 
-  predictRotation: function (data) {
+  _onnxSession: null,
+  _onnxLoading: false,
+
+  async _getOnnxSession () {
+    if (this._onnxSession) return this._onnxSession;
+    if (this._onnxLoading) {
+      while (this._onnxLoading) await new Promise(r => setTimeout(r, 50));
+      return this._onnxSession;
+    }
+    this._onnxLoading = true;
+    try {
+      this._onnxSession = await ort.InferenceSession.create(
+        process.env.PUBLIC_URL + '/models/rotation_model.onnx'
+      );
+      console.log('ONNX rotation model loaded in browser');
+    } catch (e) {
+      console.error('Failed to load ONNX model:', e);
+      this._onnxSession = null;
+    }
+    this._onnxLoading = false;
+    return this._onnxSession;
+  },
+
+  _sampleOneObj (points) {
+    const NUM_POINT = 512;
+    const n = points.length;
+    const out = new Float32Array(NUM_POINT * 3);
+    if (n >= NUM_POINT) {
+      const idx = Array.from({ length: n }, (_, i) => i);
+      for (let i = idx.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = idx[i]; idx[i] = idx[j]; idx[j] = tmp;
+      }
+      for (let i = 0; i < NUM_POINT; i++) {
+        out[i * 3] = points[idx[i]][0];
+        out[i * 3 + 1] = points[idx[i]][1];
+        out[i * 3 + 2] = points[idx[i]][2];
+      }
+    } else {
+      for (let i = 0; i < n; i++) {
+        out[i * 3] = points[i][0];
+        out[i * 3 + 1] = points[i][1];
+        out[i * 3 + 2] = points[i][2];
+      }
+    }
+    return out;
+  },
+
+  async _predictRotationFrontend (data) {
+    const session = await this._getOnnxSession();
+    if (!session) {
+      console.warn('ONNX session unavailable, falling back to backend');
+      return this._predictRotationBackend(data);
+    }
+
+    const NUM_POINT = 512;
+    const RESAMPLE_NUM = 10;
+    const input = new Float32Array(RESAMPLE_NUM * NUM_POINT * 3);
+    for (let r = 0; r < RESAMPLE_NUM; r++) {
+      input.set(this._sampleOneObj(data), r * NUM_POINT * 3);
+    }
+
+    const tensor = new ort.Tensor('float32', input, [RESAMPLE_NUM, NUM_POINT, 3]);
+    const results = await session.run({ points: tensor });
+    const output = results[Object.keys(results)[0]].data;
+
+    let maxVal = -Infinity; let maxIdx = 0;
+    for (let i = 0; i < 120; i++) {
+      if (output[i] > maxVal) { maxVal = output[i]; maxIdx = i; }
+    }
+
+    const angle = (maxIdx * 3 + 1.5) * Math.PI / 180.0;
+    return { angle: [0, 0, angle] };
+  },
+
+  _predictRotationBackend (data) {
     const req = new Request('/api/predictRotation');
     const init = {
       method: 'POST',
       body: JSON.stringify({ points: data })
     };
-    // we defined the xhr
-    console.log('start predict rotatoin.', data.length, 'points');
+    console.log('start predict rotation.', data.length, 'points');
 
     return fetch(req, init)
       .then(response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         } else {
-          console.log('predict rotatoin response received.');
+          console.log('predict rotation response received.');
           return response.json();
         }
       })
-      .catch(reject => {
-        console.log('error predicting yaw angle!');
+      .catch(e => {
+        console.log('error predicting yaw angle!', e);
       });
+  },
+
+  predictRotation: function (data) {
+    const mode = window.pointsGlobalConfig
+      ? window.pointsGlobalConfig.rotationInference
+      : 'frontend';
+    if (mode === 'frontend') {
+      return this._predictRotationFrontend(data);
+    } else {
+      return this._predictRotationBackend(data);
+    }
   },
 
   // autoadj is async

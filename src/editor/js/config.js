@@ -45,6 +45,9 @@ class Config {
     this.ignoreDistantObject = true;
     this.cameraGroupForContext = 'camera';
 
+    // "frontend" = run ONNX model in browser, "backend" = call server API
+    this.rotationInference = 'frontend';
+
     /// editorCfg
 
     // this.disableSceneSelector = true;
@@ -78,7 +81,8 @@ class Config {
       ['autoUpdateInterpolatedBoxes', this.toBool],
       ['maxWorldNumber', parseInt],
       ['cameraGroupForContext', null],
-      ['enableImageAnnotation', this.toBool]
+      ['enableImageAnnotation', this.toBool],
+      ['rotationInference', null]
     ];
   }
 

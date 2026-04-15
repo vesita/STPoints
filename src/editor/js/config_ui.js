@@ -116,6 +116,12 @@ class ConfigUi {
         return false;
       },
 
+      '#cfg-rotation-inference-select': (event) => {
+        const value = event.currentTarget.value;
+        window.pointsGlobalConfig.setItem('rotationInference', value);
+        return false;
+      },
+
       '#cfg-auto-update-interpolated-boxes-checkbox': (event) => {
         const checked = event.currentTarget.checked;
         window.pointsGlobalConfig.setItem('autoUpdateInterpolatedBoxes', checked);
@@ -324,6 +330,7 @@ class ConfigUi {
     this.menu.querySelector('#cfg-hide-category-checkbox').value = window.pointsGlobalConfig.hideCategory;
     this.menu.querySelector('#cfg-data-preload-checkbox').checked = window.pointsGlobalConfig.enablePreload;
     this.menu.querySelector('#cfg-auto-rotate-xy-checkbox').checked = window.pointsGlobalConfig.enableAutoRotateXY;
+    this.menu.querySelector('#cfg-rotation-inference-select').value = window.pointsGlobalConfig.rotationInference;
     this.menu.querySelector('#cfg-auto-update-interpolated-boxes-checkbox').checked = window.pointsGlobalConfig.autoUpdateInterpolatedBoxes;
     this.menu.querySelector('#cfg-camera-group-for-context-select').value = window.pointsGlobalConfig.cameraGroupForContext;
     this.menu.querySelector('#cfg-enable-image-annotation-checkbox').checked = window.pointsGlobalConfig.enableImageAnnotation;

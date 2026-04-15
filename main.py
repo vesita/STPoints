@@ -128,7 +128,8 @@ def check_file_access(default=False):
 
 # sys.path.append(os.path.join(BASE_DIR, './algos'))
 #import algos.rotation as rotation
-from algos import pre_annotate as pre_annotate
+# from algos import pre_annotate as pre_annotate
+import algos.rotation_onnx as rotation
 
 
 #sys.path.append(os.path.join(BASE_DIR, '../tracking'))
@@ -318,7 +319,7 @@ class Api(object):
       
       data = json.loads(rawbody)
       
-      return {"angle": pre_annotate.predict_yaw(data["points"])}
+      return {"angle": rotation.predict(data["points"])}
       #return {}
 
     
@@ -495,6 +496,12 @@ root_config = {
   '/help':{
     'tools.staticdir.on': True,
     'tools.staticdir.dir':"./help",
+    'tools.staticdir.root': os.path.abspath(os.getcwd()),
+  },
+
+  '/models':{
+    'tools.staticdir.on': True,
+    'tools.staticdir.dir': './public/models',
     'tools.staticdir.root': os.path.abspath(os.getcwd()),
   }
 }

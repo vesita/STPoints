@@ -5,7 +5,7 @@ temp
 *.pyc
 **.h5
 image_temp
-tools/pypcd
+# tools/pypcd
 temp*/
 node_modules
 package-lock.json
@@ -18,3 +18,5 @@ log
 tools/.ipynb*
 **.ipynb
 output
+.venv
+dataset
