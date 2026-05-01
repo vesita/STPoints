@@ -21,7 +21,7 @@ class LogWindow extends PopupDialog{
         this.clearBtn = this.ui.querySelector("#btn-clear");
 
         this.clearBtn.onclick = ()=>{ this.logsContentUi.innerHTML = ""; };
-        this.log("Welcome!");
+        this.log("欢迎！");
 
         this.logBtn = this.ui.querySelector("#tab-log");
         this.errorBtn = this.ui.querySelector("#tab-error");
@@ -45,7 +45,7 @@ class LogWindow extends PopupDialog{
 
     setErrorsContent(errors)
     {
-        let summary = `${errors.length} warnings.<br>`;
+        let summary = `${errors.length} 个警告。<br>`;
         let text = errors.map(r=>`<a class='log-object-frame-id'>${r.frame_id},${r.obj_id}</a>, ${r.desc}<br>`).reduce((a,b)=>a+b, summary);
         this.errorsContentUi.innerHTML = text;
 

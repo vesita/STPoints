@@ -365,7 +365,7 @@ class Trajectory extends PopupDialog{
         p.setAttribute("font-size", 10 * this.viewScale+"px");
         p.setAttribute("class",'scaler-label');
         let text = document.createElementNS("http://www.w3.org/1999/xhtml", 'div');
-        text.textContent = x.toString() + 'm';
+        text.textContent = x.toString() + '米';
         p.appendChild(text);
 
         g.appendChild(p);
@@ -395,7 +395,7 @@ class Trajectory extends PopupDialog{
         let svg = this.ui.querySelector("#svg-arrows");
 
         let g = document.createElementNS("http://www.w3.org/2000/svg", 'g');
-        g.innerHTML = `<title>Ego car</title>`;
+        g.innerHTML = `<title>自车</title>`;
         g.setAttribute("id", "track-ego-car");
         svg.appendChild(g);
 

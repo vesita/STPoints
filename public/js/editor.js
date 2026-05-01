@@ -21,7 +21,6 @@ import { ContextMenu } from './context_menu.js';
 import { InfoBox } from './info_box.js';
 import {CropScene} from './crop_scene.js';
 import { ConfigUi } from './config_ui.js';
-import { MovableView } from './popup_dialog.js';
 import {globalKeyDownManager} from './keydown_manager.js';
 import {vector_range} from "./util.js"
 import { checkScene } from './error_check.js';
@@ -213,14 +212,11 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
             "main-boxe-ditor");
         this.boxEditor.detach(); // hide it
         this.boxEditor.setResize("both");
-        this.boxEditor.moveHandle = new MovableView(
-            boxEditorUi.querySelector("#focuscanvas"),
-            boxEditorUi.querySelector("#sub-views"),
-            ()=>{
-                this.boxEditor.update();
-                this.render();
-            }
-        );
+
+        // Click focuscanvas to toggle manual calibration panel
+        boxEditorUi.querySelector("#focuscanvas").addEventListener("click", ()=>{
+            this.calib.toggleManualCalib();
+        });
 
         this.mouse = new Mouse(
             this.viewManager.mainView,
@@ -388,7 +384,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         case "label-copy":
             if (!this.selected_box.obj_track_id)
             {
-                this.infoBox.show("Error", "Please assign object track ID.");
+                this.infoBox.show("错误", "请先指定对象跟踪ID。");
             
             }
             else
@@ -632,8 +628,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                 if (modifiedFrames.length > 0)
                 {
                     this.infoBox.show(
-                        "Confirm",
-                        `Discard changes to ${modifiedFrames.length} frames, continue to reload?`,
+                        "确认",
+                        `放弃对 ${modifiedFrames.length} 帧的修改，继续重新加载？`,
                         ["yes","no"],
                         (choice)=>{
                             if (choice=="yes")
@@ -688,7 +684,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                     };
                 }
 
-                this.infoBox.show("Frame info - " + this.data.world.frameInfo.scene, JSON.stringify(info,null,"<br>"));
+                this.infoBox.show("帧信息 - " + this.data.world.frameInfo.scene, JSON.stringify(info,null,"<br>"));
             }
             break;
 
@@ -702,7 +698,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                         frames: this.data.world.frameInfo.sceneMeta.frames.length,
                     };
 
-                    this.infoBox.show("Stat - " + scene, JSON.stringify(info, null,"<br>"));
+                    this.infoBox.show("统计 - " + scene, JSON.stringify(info, null,"<br>"));
                 });
             }
             break;
@@ -747,7 +743,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         case "cm-select-as-ref":
             if (!this.selected_box.obj_track_id)
             {
-                this.infoBox.show("Error", "Please assign object track ID.");
+                this.infoBox.show("错误", "请先指定对象跟踪ID。");
                 return false;
             }
             else
@@ -993,7 +989,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
     {
         if (!this.selected_box.obj_track_id)
         {
-            this.infoBox.show("Error", "Please assign object track ID.");
+            this.infoBox.show("错误", "请先指定对象跟踪ID。");
             return false;
         }
 
@@ -1004,7 +1000,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
     {
         if (!this.autoAdjust.marked_object)
         {
-            this.infoBox.show("Notice", 'No reference object was selected');
+            this.infoBox.show("提示", "未选择参考对象");
             return false;
         }
 
@@ -1025,8 +1021,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         {
             this.data.forcePreloadScene(this.data.world.frameInfo.scene, this.data.world);
 
-            this.infoBox.show("Notice", 
-                `Loading scene in background. Please try again later.`);
+            this.infoBox.show("提示",
+                "后台正在加载场景，请稍后再试。");
             return false;
         }
 
@@ -2206,7 +2202,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
         if (frame_index < 0){
             console.log("first frame");
-            this.infoBox.show("Notice", "This is the first frame");
+            this.infoBox.show("提示", "这是第一帧");
             return;
         }
 
@@ -2242,7 +2238,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
         if (frame_index >= num_frames){
             console.log("last frame");
-            this.infoBox.show("Notice", "This is the last frame");
+            this.infoBox.show("提示", "这是最后一帧");
             return;
         }
 

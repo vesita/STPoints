@@ -70,7 +70,7 @@ function saveWorldList(worldList){
     
     saveDelayTimer = setTimeout(()=>{
             
-        logger.log("save delay expired.");
+        logger.log("保存延迟已过。");
 
         //pandingSaveList will be cleared soon.
         let scene = pendingSaveList[0].frameInfo.scene;
@@ -126,14 +126,14 @@ function doSaveWorldList(worldList, done)
                 w.annotation.resetModified();
             })
 
-            logger.log(`saved: ${worldList[0].frameInfo.scene}: ${worldList.reduce((a,b)=>a+" "+b.frameInfo.frame, "")}`);
+            logger.log(`已保存：${worldList[0].frameInfo.scene}: ${worldList.reduce((a,b)=>a+" "+b.frameInfo.frame, "")}`);
 
             if(done){
                 done();
             }
         }
         else{
-            window.editor.infoBox.show("Error", `save failed, status : ${this.status}`);
+            window.editor.infoBox.show("错误", `保存失败，状态码：${this.status}`);
         }
         
     

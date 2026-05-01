@@ -39,7 +39,7 @@ var Header=function(ui, data, cfg, onSceneChanged, onFrameChanged, onObjectSelec
     
 
     this.updateSceneList = function(sceneDescList){
-        let scene_selector_str = "<option>--scene--</option>";
+        let scene_selector_str = "<option>--场景--</option>";
         for (let scene in sceneDescList)
         {
             if (data.sceneDescList[scene])
@@ -86,13 +86,13 @@ var Header=function(ui, data, cfg, onSceneChanged, onFrameChanged, onObjectSelec
         let distance = Math.sqrt(pos.x*pos.x + pos.y*pos.y).toFixed(2);
 
         this.boxUi.innerHTML = "<span>" + box.obj_type +"-"+box.obj_track_id + 
-                               (box.annotator? ("</span> | <span title='annotator'>" + box.annotator) : "") +
-                               "</span> | <span title='distance'>" + distance +
-                               "</span> | <span title='position'>"+pos.x.toFixed(2) +" "+pos.y.toFixed(2) + " " + pos.z.toFixed(2) + 
-                               "</span> | <span title='scale'>" +scale.x.toFixed(2) +" "+scale.y.toFixed(2) + " " + scale.z.toFixed(2) + 
-                               "</span> | <span title='rotation'>" +
+                               (box.annotator? ("</span> | <span title='标注员'>" + box.annotator) : "") +
+                               "</span> | <span title='距离'>" + distance +
+                               "</span> | <span title='位置'>"+pos.x.toFixed(2) +" "+pos.y.toFixed(2) + " " + pos.z.toFixed(2) +
+                               "</span> | <span title='尺寸'>" +scale.x.toFixed(2) +" "+scale.y.toFixed(2) + " " + scale.z.toFixed(2) +
+                               "</span> | <span title='旋转'>" +
                                 (rotation.x*180/Math.PI).toFixed(2)+" "+(rotation.y*180/Math.PI).toFixed(2)+" "+(rotation.z*180/Math.PI).toFixed(2)+
-                                "</span> | <span title = 'points'>" +
+                                "</span> | <span title = '点数'>" +
                                 points_number + "</span> ";
         if (box.follows){
             this.boxUi.innerHTML += "| F:"+box.follows.obj_track_id;

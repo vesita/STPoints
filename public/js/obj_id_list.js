@@ -33,7 +33,7 @@ class ObjectIdManager
         let objSelOptions = this.objectList.map(function(c){
             return "<option value="+c.id+">"+String(c.id) +"-"+ c.category+"</option>";
           }).reduce(function(x,y){return x+y;},
-                    "<option>--object--</option>");
+                    "<option>--对象--</option>");
         document.getElementById("object-selector").innerHTML = objSelOptions;
 
 

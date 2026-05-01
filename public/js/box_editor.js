@@ -834,8 +834,8 @@ function BoxEditorManager(parentUi, viewManager, objectTrackView,
         if (selectedEditors.length >= 2)
         {
             window.editor.infoBox.show(
-                "Confirm",
-                `Delete <span class="red">${selectedEditors.length}</span> selected boxes?`,
+                "确认",
+                `删除选中的 <span class="red">${selectedEditors.length}</span> 个框？`,
                 ["yes", "no"],
                 (btn)=>{
                     if (btn == "yes")
@@ -1329,8 +1329,8 @@ function BoxEditorManager(parentUi, viewManager, objectTrackView,
         if (modifiedFrames.length > 0)
         {
             window.editor.infoBox.show(
-                "Confirm",
-                `Discard changes to ${modifiedFrames.length} frames, continue to reload?`,
+                "确认",
+                `放弃对 ${modifiedFrames.length} 帧的修改，继续重新加载？`,
                 ["yes","no"],
                 (choice)=>{
                     if (choice=="yes")
@@ -1496,7 +1496,7 @@ function BoxEditorManager(parentUi, viewManager, objectTrackView,
             }
             else 
             {
-                window.editor.infoBox.show("Info", "This is the last batch of frames.");
+                window.editor.infoBox.show("信息", "这是最后一批帧。");
             }
             
         }
@@ -1524,7 +1524,7 @@ function BoxEditorManager(parentUi, viewManager, objectTrackView,
             }
             else 
             {
-                window.editor.infoBox.show("Info", "This is the first batch  of frames");
+                window.editor.infoBox.show("信息", "这是第一批帧。");
             }
             
         }
