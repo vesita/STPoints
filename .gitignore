@@ -20,3 +20,6 @@ tools/.ipynb*
 output
 .venv
 dataset
+
+.claude
+uv.lock
