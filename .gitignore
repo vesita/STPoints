@@ -9,3 +9,4 @@ image_temp
 tools/pypcd
 temp*/
 uv.lock
+.claude
