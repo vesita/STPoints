@@ -290,6 +290,121 @@ class ImageContext extends MovableView{
     points = [];
     polyline;
 
+    // ── PnP handle state ──────────────────────────────────────────────────
+    _pnpDragging = -1;
+    _pnpOnDrag = null;
+
+    /** Render 4 drag handles at the given corner positions */
+    renderPnpHandles(corners) {
+        this.clearPnpHandles();
+        var g = this.ui.querySelector("#svg-pnp-handles");
+        if (!g) return;
+        var self = this;
+        var trans_ratio = this.get_trans_ratio();
+        if (!trans_ratio) return;
+
+        for (var i = 0; i < 4; i++) {
+            if (!corners[i]) continue;
+
+            var u = Math.round(corners[i].u * trans_ratio.x);
+            var v = Math.round(corners[i].v * trans_ratio.y);
+
+            var hg = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            hg.setAttribute("class", "pnp-handle");
+            hg.setAttribute("data-idx", i);
+            g.appendChild(hg);
+
+            var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", u);
+            circle.setAttribute("cy", v);
+            circle.setAttribute("r", 8);
+            circle.setAttribute("class", "pnp-handle-circle");
+            circle.setAttribute("data-idx", i);
+            circle.onmousedown = function (e) {
+                e.stopPropagation();
+                self._pnpDragging = parseInt(this.getAttribute("data-idx"));
+                self.ui.style.cursor = "grabbing";
+            };
+            hg.appendChild(circle);
+
+            var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", u + 12);
+            text.setAttribute("y", v - 12);
+            text.setAttribute("class", "pnp-handle-label");
+            text.appendChild(document.createTextNode("P" + i));
+            hg.appendChild(text);
+        }
+
+        // Drag tracking on image-wrapper (works even when mouse leaves the circle)
+        this.ui.addEventListener("mousemove", this._pnpOnMouseMove);
+        this.ui.addEventListener("mouseup", this._pnpOnMouseUp);
+        this.ui.addEventListener("mouseleave", this._pnpOnMouseUp);
+    }
+
+    /** Remove all PnP handles and clean up event listeners */
+    clearPnpHandles() {
+        this._pnpDragging = -1;
+        this.ui.style.cursor = "";
+        this.ui.removeEventListener("mousemove", this._pnpOnMouseMove);
+        this.ui.removeEventListener("mouseup", this._pnpOnMouseUp);
+        this.ui.removeEventListener("mouseleave", this._pnpOnMouseUp);
+
+        var g = this.ui.querySelector("#svg-pnp-handles");
+        if (g) {
+            while (g.firstChild) g.firstChild.remove();
+        }
+    }
+
+    /** Move a single handle to new image-pixel coordinates (auto-scaled to SVG) */
+    updatePnpHandle(idx, u, v) {
+        var g = this.ui.querySelector("#svg-pnp-handles");
+        if (!g) return;
+        var trans_ratio = this.get_trans_ratio();
+        if (!trans_ratio) return;
+        var su = Math.round(u * trans_ratio.x);
+        var sv = Math.round(v * trans_ratio.y);
+        for (var i = 0; i < g.children.length; i++) {
+            var hg = g.children[i];
+            if (parseInt(hg.getAttribute("data-idx")) === idx) {
+                var circle = hg.querySelector("circle");
+                var text = hg.querySelector("text");
+                if (circle) {
+                    circle.setAttribute("cx", su);
+                    circle.setAttribute("cy", sv);
+                }
+                if (text) {
+                    text.setAttribute("x", su + 12);
+                    text.setAttribute("y", sv - 12);
+                }
+                break;
+            }
+        }
+    }
+
+    _pnpOnMouseMove = (e) => {
+        if (this._pnpDragging < 0) return;
+        var svg = this.ui.querySelector("#maincanvas-svg");
+        var rect = svg.getBoundingClientRect();
+        // Convert mouse to SVG viewBox coords
+        var svgU = (e.clientX - rect.left) * 2048 / rect.width;
+        var svgV = (e.clientY - rect.top) * 1536 / rect.height;
+        // Convert to actual image pixel coords for the PnP system
+        var trans_ratio = this.get_trans_ratio();
+        var u = trans_ratio ? Math.round(svgU / trans_ratio.x) : Math.round(svgU);
+        var v = trans_ratio ? Math.round(svgV / trans_ratio.y) : Math.round(svgV);
+        u = Math.max(0, Math.min(Math.round(2048 / (trans_ratio ? trans_ratio.x : 1)), u));
+        v = Math.max(0, Math.min(Math.round(1536 / (trans_ratio ? trans_ratio.y : 1)), v));
+        this.updatePnpHandle(this._pnpDragging, u, v);
+        if (this._pnpOnDrag) {
+            this._pnpOnDrag(this._pnpDragging, u, v);
+        }
+    };
+
+    _pnpOnMouseUp = () => {
+        this._pnpDragging = -1;
+        this.ui.style.cursor = "";
+    };
+
     all_lines=[];
     
     img_lidar_point_map = {};
@@ -333,6 +448,9 @@ class ImageContext extends MovableView{
     }
 
     on_click(e){
+        // Ignore click during PnP handle drag
+        if (this._pnpDragging >= 0) return;
+
         var p= this.to_viewbox_coord(e.layerX, e.layerY);
         var x=p[0];
         var y=p[1];
@@ -1027,6 +1145,24 @@ class ImageContextManager {
         this.init_image_op_para = op;
         this.images.forEach(i=>i.init_image_op(op));
     }
+
+    // ── PnP handle delegation (all images) ────────────────────────────────
+    setPnpOnDrag(callback){
+        this.images.forEach(i=>{ i._pnpOnDrag = callback; });
+    }
+
+    renderPnpHandles(corners){
+        this.images.forEach(i=>i.renderPnpHandles(corners));
+    }
+
+    clearPnpHandles(){
+        this.images.forEach(i=>i.clearPnpHandles());
+        this.images.forEach(i=>{ i._pnpOnDrag = null; });
+    }
+
+    updatePnpHandle(idx, u, v){
+        this.images.forEach(i=>i.updatePnpHandle(idx, u, v));
+    }
     hidden(){
         return false;
     }
@@ -1207,4 +1343,4 @@ function  choose_best_camera_for_point(scene_meta, center){
 }
 
 
-export {ImageContextManager, BoxImageContext};
+export {ImageContextManager, BoxImageContext, box_to_2d_points, points3d_homo_to_image2d};

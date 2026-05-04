@@ -1081,3 +1081,244 @@ td {
 	width: 100%;
 	z-index: 10;	
 }
+
+/* ── PnP 外参矫正面板 ─────────────────────────── */
+
+.hidden {
+	display: none !important;
+}
+
+.pnp-panel {
+	display: none;
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background: var(--window-background-color);
+	color: var(--font-color);
+	font-size: 12px;
+	z-index: 5;
+	border-top: 1px solid var(--widget-background-color);
+	user-select: none;
+}
+
+.pnp-panel.active {
+	display: block;
+}
+
+.pnp-header {
+	background: var(--widget-background-color);
+	padding: 2px 8px;
+	font-weight: bold;
+	font-size: 13px;
+	line-height: 22px;
+}
+
+.pnp-body {
+	padding: 4px 8px;
+}
+
+.pnp-corners {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 2px 16px;
+	margin-bottom: 4px;
+}
+
+.pnp-corner {
+	font-family: monospace;
+	font-size: 11px;
+	line-height: 18px;
+}
+
+.pnp-corner b {
+	color: #ffcc00;
+}
+
+.pnp-buttons {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 4px;
+}
+
+.pnp-btn {
+	flex: 1;
+	padding: 3px 6px;
+	border: 1px solid var(--widget-color);
+	background: var(--widget-background-color);
+	color: var(--font-color);
+	cursor: pointer;
+	font-size: 11px;
+	line-height: 18px;
+	text-align: center;
+	border-radius: 2px;
+}
+
+.pnp-btn:hover:not(:disabled) {
+	background: var(--highlight-background-color);
+}
+
+.pnp-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.pnp-btn-primary {
+	border-color: #4a9eff;
+	color: #4a9eff;
+}
+
+.pnp-btn-save {
+	border-color: #4caf50;
+	color: #4caf50;
+}
+
+.pnp-error {
+	font-family: monospace;
+	font-size: 11px;
+	line-height: 18px;
+	color: #ffcc00;
+}
+
+.pnp-footer {
+	padding: 2px 8px 4px;
+	font-size: 10px;
+	line-height: 16px;
+	color: var(--widget-color);
+	border-top: 1px solid var(--widget-background-color);
+}
+
+/* ── PnP SVG handles ─────────────────────────── */
+
+.pnp-handle-circle {
+	fill: rgba(255, 200, 0, 0.6);
+	stroke: #ffcc00;
+	stroke-width: 2;
+	cursor: grab;
+}
+
+.pnp-handle-circle:hover {
+	fill: rgba(255, 200, 0, 0.9);
+	stroke: #ffffff;
+	stroke-width: 3;
+}
+
+.pnp-handle-label {
+	fill: #ffcc00;
+	font-size: 14px;
+	font-weight: bold;
+	font-family: sans-serif;
+	pointer-events: none;
+	text-shadow:
+		-1px -1px 0 #000,
+		 1px -1px 0 #000,
+		-1px  1px 0 #000,
+		 1px  1px 0 #000;
+}
+
+/* ── PnP Calibration Popup ─────────────────────── */
+
+#pnp-calib-wrapper #view {
+	left: 10%;
+	top: 10%;
+	width: 80%;
+	height: 80%;
+	display: flex;
+	flex-direction: column;
+}
+
+#pnp-calib-wrapper #header {
+	flex-shrink: 0;
+	cursor: grab;
+}
+#pnp-calib-wrapper #header:active {
+	cursor: grabbing;
+}
+
+#pnp-calib-body {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+#pnp-calib-image-area {
+	flex: 1;
+	position: relative;
+	overflow: hidden;
+	background: #000;
+	min-height: 100px;
+	cursor: crosshair;
+}
+
+#pnp-calib-svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+#pnp-calib-controls {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 6px 12px;
+	background: var(--window-background-color);
+	border-top: 1px solid var(--widget-background-color);
+	flex-wrap: wrap;
+}
+
+#pnp-calib-controls .pnp-corners {
+	margin-bottom: 0;
+	flex-shrink: 0;
+}
+
+#pnp-calib-controls .pnp-buttons {
+	margin-bottom: 0;
+	flex-shrink: 0;
+}
+
+#pnp-calib-controls .pnp-error {
+	flex-shrink: 0;
+}
+
+#pnp-calib-body > .pnp-footer {
+	flex-shrink: 0;
+	padding: 2px 12px 6px;
+	font-size: 10px;
+	line-height: 16px;
+	color: var(--widget-color);
+	text-align: center;
+}
+
+#pnp-calib-body .pnp-btn {
+	padding: 4px 12px;
+	font-size: 12px;
+	line-height: 20px;
+}
+
+#pnp-calib-handles .pnp-handle-circle {
+	fill: rgba(255, 200, 0, 0.7);
+	stroke: #ffcc00;
+	stroke-width: 2.5;
+	cursor: grab;
+}
+
+#pnp-calib-handles .pnp-handle-circle:hover {
+	fill: rgba(255, 200, 0, 1);
+	stroke: #ffffff;
+	stroke-width: 3.5;
+}
+
+#pnp-calib-handles .pnp-handle-label {
+	fill: #ffcc00;
+	font-size: 16px;
+	font-weight: bold;
+	font-family: sans-serif;
+	pointer-events: none;
+	text-shadow:
+		-1px -1px 0 #000,
+		 1px -1px 0 #000,
+		-1px  1px 0 #000,
+		 1px  1px 0 #000;
+}

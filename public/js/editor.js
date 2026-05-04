@@ -16,6 +16,7 @@ import {reloadWorldList, saveWorldList} from "./save.js";
 import {logger, create_logger} from "./log.js";
 import {autoAnnotate} from "./auto_annotate.js";
 import {Calib} from "./calib.js";
+import {PnPCalib} from "./calib_pnp.js";
 import {Trajectory} from "./trajectory.js";
 import { ContextMenu } from './context_menu.js';
 import { InfoBox } from './info_box.js';
@@ -58,6 +59,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         }
     };
     this.calib = new Calib(this.data, this);
+    this.pnpCalib = new PnPCalib(this.data, this);
 
     this.header = null;
     this.imageContextManager = null;
@@ -78,6 +80,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         this.playControl = new PlayControl(this.data);
 
         this.configUi = new ConfigUi(editorUi.querySelector("#config-button"), editorUi.querySelector("#config-wrapper"), this);
+
+        if (this.pnpCalib) this.pnpCalib.init();
 
         this.header = new Header(editorUi.querySelector("#header"), this.data, this.editorCfg,
             (e)=>{
@@ -1559,6 +1563,9 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
 
     this.handleLeftClick= function(event) {
+
+            // PnP 模式下不处理 box 选中/取消
+            if (this.pnpCalib && this.pnpCalib.active) return;
 
             if (event.ctrlKey){
                 //Ctrl+left click to smart paste!

@@ -19,6 +19,7 @@ def get_all_scene_desc():
 
 def get_scene_names():
       scenes = os.listdir(root_dir)
+      scenes = filter(lambda s: os.path.isdir(os.path.join(root_dir, s, "lidar")), scenes)
       scenes = filter(lambda s: not os.path.exists(os.path.join(root_dir, s, "disable")), scenes)
       scenes = list(scenes)
       scenes.sort()

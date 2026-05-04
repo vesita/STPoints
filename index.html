@@ -892,6 +892,10 @@
 
 									</div>
 									
+									<div class="menu-item" id="cfg-start-pnp">
+										<div class="menu-item-text">PnP 外参矫正</div>
+									</div>
+									
 									<div class="menu-item" id="cfg-crop-scene">
 										<div class="menu-item-text">裁剪场景</div>				
 									</div>
@@ -1078,6 +1082,49 @@
 				<div id="move-handle-wrapper">
 				</div>
 				
+
+				<div id="pnp-calib-wrapper" class="popup-window-wrapper" tabindex="-1">
+					<div id="view">
+						<div id="header">
+							<span id="title">PnP 外参矫正</span>
+							<div id="buttons">
+								<div id="pnp-calib-exit" class="ui-button" title="关闭">
+									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
+										<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
+									</g></svg>
+								</div>
+							</div>
+						</div>
+						<div id="pnp-calib-body">
+							<div id="pnp-calib-image-area">
+								<svg id="pnp-calib-svg" viewBox="0 0 2048 1536" preserveAspectRatio="none">
+									<image id="pnp-calib-img" x="0" y="0" width="2048" height="1536" preserveAspectRatio="none" xlink:href="" />
+									<g id="pnp-calib-handles"></g>
+								</svg>
+							</div>
+							<div id="pnp-calib-controls">
+								<div class="pnp-corners">
+									<div class="pnp-corner" data-idx="0"><b style="color:#ff6666">P0(左下)</b>: <span class="pnp-corner-pos">--, --</span></div>
+									<div class="pnp-corner" data-idx="1"><b style="color:#66ff66">P1(右下)</b>: <span class="pnp-corner-pos">--, --</span></div>
+									<div class="pnp-corner" data-idx="2"><b style="color:#6666ff">P2(右上)</b>: <span class="pnp-corner-pos">--, --</span></div>
+									<div class="pnp-corner" data-idx="3"><b style="color:#ffff66">P3(左上)</b>: <span class="pnp-corner-pos">--, --</span></div>
+								</div>
+								<div class="pnp-buttons">
+									<button id="pnp-calib-solve" class="pnp-btn pnp-btn-primary" disabled>计算 PnP</button>
+									<button id="pnp-calib-cycle" class="pnp-btn" title="轮换 P0→P1→P2→P3">轮换点序</button>
+									<button id="pnp-calib-brute" class="pnp-btn" title="穷举 24 种点序组合">穷举测试</button>
+									<button id="pnp-calib-reset" class="pnp-btn">重置</button>
+									<button id="pnp-calib-save" class="pnp-btn pnp-btn-save" disabled>保存</button>
+								</div>
+								<div class="pnp-error">重投影误差: <span id="pnp-calib-error">--</span> px</div>
+							</div>
+							<div class="pnp-footer">
+								在 3D 点云视图中依次点击 box 的 4 个角点(选为 P0-P3)，2D 位置自动投影后可拖拽微调，再点击「计算 PnP」<br/>
+								<span style="color:#ff6666">红(P0)</span> <span style="color:#66ff66">绿(P1)</span> <span style="color:#6666ff">蓝(P2)</span> <span style="color:#ffff66">黄(P3)</span> &nbsp;—&nbsp; 可选任意 4 个角点，不必限于同一面
+							</div>
+						</div>
+					</div>
+				</div>
 
 		</template>
 		<template id="box-editor-ui-template"><div id="sub-views">

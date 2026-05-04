@@ -47,6 +47,16 @@ class ConfigUi{
             return true;
         },
 
+        "#cfg-start-pnp":(event)=>{
+            var box = this.editor.selected_box;
+            if (box) {
+                this.editor.pnpCalib.enter(box);
+            } else {
+                alert("请先在 3D 场景中选择一个物体框");
+            }
+            return true;
+        },
+
         "#cfg-show-calib":(event)=>{
             this.editor.calib.save_calibration();
             return true;

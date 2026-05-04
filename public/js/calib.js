@@ -6,7 +6,7 @@ function Calib(data, editor){
     this.data = data;
     this.editor = editor;
 
-    var euler_angle={x:0, y:0, y:0};
+    var euler_angle={x:0, y:0, z:0};
     var translate = {x:0, y:0, z:0};
     
     this.save_calibration = function(){
