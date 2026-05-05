@@ -25,6 +25,7 @@ import { ConfigUi } from './config_ui.js';
 import {globalKeyDownManager} from './keydown_manager.js';
 import {vector_range} from "./util.js"
 import { checkScene } from './error_check.js';
+import { MeasureTool } from './measure.js';
 
 function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
@@ -60,6 +61,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
     };
     this.calib = new Calib(this.data, this);
     this.pnpCalib = new PnPCalib(this.data, this);
+    this.measureTool = new MeasureTool(this);
 
     this.header = null;
     this.imageContextManager = null;
@@ -82,6 +84,14 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         this.configUi = new ConfigUi(editorUi.querySelector("#config-button"), editorUi.querySelector("#config-wrapper"), this);
 
         if (this.pnpCalib) this.pnpCalib.init();
+
+        // 测量按钮事件绑定
+        var measureBtn = editorUi.querySelector("#measure-button");
+        if (measureBtn) {
+            measureBtn.addEventListener("click", function() {
+                self.measureTool.toggle();
+            });
+        }
 
         this.header = new Header(editorUi.querySelector("#header"), this.data, this.editorCfg,
             (e)=>{
@@ -1564,6 +1574,12 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
     this.handleLeftClick= function(event) {
 
+            // 测量模式下拾取点
+            if (this.measureTool && this.measureTool.measuring) {
+                this.measureTool.addPoint(this.mouse.onUpPosition);
+                return;
+            }
+
             // PnP 模式下不处理 box 选中/取消
             if (this.pnpCalib && this.pnpCalib.active) return;
 
@@ -2032,6 +2048,11 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         this.operation_state.key_pressed = true;
 
         switch ( ev.key) {
+            case 'Escape':
+                if (this.measureTool && this.measureTool.measuring) {
+                    this.measureTool.stop();
+                }
+                break;
             case '+':
             case '=':
                 this.data.scale_point_size(1.2);

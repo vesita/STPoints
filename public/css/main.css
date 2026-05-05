@@ -1411,3 +1411,32 @@ td {
 .pnp-top4-save-btn:hover {
 	background: var(--hover-background-color, #555);
 }
+
+/* ── Measure Tool ────────────────────────── */
+
+#measure-button {
+	cursor: pointer;
+}
+
+#measure-button.active {
+	background: var(--highlight-background-color, #555);
+}
+
+#measure-button.active svg {
+	color: var(--highlight-color, yellow);
+}
+
+#measure-status {
+	position: absolute;
+	bottom: 30px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(0, 0, 0, 0.75);
+	color: #ffff00;
+	padding: 6px 16px;
+	border-radius: 4px;
+	font-size: 14px;
+	z-index: 1000;
+	pointer-events: none;
+	white-space: nowrap;
+}
