@@ -51,10 +51,10 @@ function PnPCalib(data, editor) {
     /** 查询并缓存弹窗 DOM 元素 */
     this._queryDom = function () {
         if (this.wrapper) return true;
-        this.wrapper = document.getElementById("pnp-calib-wrapper");
+        this.wrapper = document.getElementById("pnp-sidebar-wrapper");
         if (!this.wrapper) return false;
 
-        var view = this.wrapper.querySelector("#view");
+        var view = this.wrapper.querySelector("#pnp-sidebar");
         this.svg = view.querySelector("#pnp-calib-svg");
         this.handleGroup = this.svg.querySelector("#pnp-calib-handles");
         this.imageEl = this.svg.querySelector("#pnp-calib-img");
@@ -85,7 +85,7 @@ function PnPCalib(data, editor) {
         view.onclick = function (e) { e.stopPropagation(); };
 
         // 弹窗拖拽
-        var header = view.querySelector("#header");
+        var header = view.querySelector("#pnp-sidebar-header");
         this._initDrag(header, view);
 
         this.svg.addEventListener("mousemove", function (e) { pnp._onMouseMove(e); });
@@ -370,15 +370,39 @@ function PnPCalib(data, editor) {
         if (this.wrapper) {
             this.wrapper.style.display = "none";
         }
+
+        // 恢复 box editor 侧边栏
+        var boxEditorWrapper = document.getElementById("main-box-editor-wrapper");
+        if (boxEditorWrapper && this.editor.selected_box) {
+            boxEditorWrapper.style.display = "";
+        }
         if (this.editor.imageContextManager) {
             this.editor.imageContextManager.clearPnpHandles();
             this.editor.imageContextManager.setPnpOnDrag(null);
         }
         this._removeZViewLabels();
         this._remove3DCornerMarkers();
+
+        // 恢复原始外参（用户未保存就关闭时）
+        if (this._savedExtrinsic) {
+            try {
+                var sceneMeta = this.data.meta[this.data.world.frameInfo.scene];
+                var camName = this._getActiveCameraName();
+                sceneMeta.calib.camera[camName].extrinsic = this._savedExtrinsic;
+                this.editor.imageContextManager.render_2d_image();
+            } catch(e) { /* ignore */ }
+            this._savedExtrinsic = null;
+        }
+
+        // 隐藏 top-4 结果
+        var top4 = this.wrapper ? this.wrapper.querySelector("#pnp-top4-results") : null;
+        if (top4) top4.style.display = "none";
+
         // 清除重投影标记
         var reproj = this.svg ? this.svg.querySelector("#pnp-reprojected-group") : null;
         if (reproj) reproj.remove();
+        var allBoxes = this.svg ? this.svg.querySelector("#pnp-all-boxes-group") : null;
+        if (allBoxes) allBoxes.remove();
     };
 
     // ── 角点拖拽回调 ──────────────────────────────────────────────────────
@@ -483,6 +507,9 @@ function PnPCalib(data, editor) {
 
             // 在弹窗图像上显示重投影点（小十字），用于对比拖拽位置
             this._renderReprojected();
+
+            // 重投影所有检测框，便于验证外参效果
+            this._renderAllBoxes();
 
             // Debug: 输出详细的标定信息
             console.log("=== PnP Solve 详细日志 ===");
@@ -599,11 +626,20 @@ function PnPCalib(data, editor) {
         // 清除重投影标记
         var reproj = this.svg ? this.svg.querySelector("#pnp-reprojected-group") : null;
         if (reproj) reproj.remove();
+        var allBoxes = this.svg ? this.svg.querySelector("#pnp-all-boxes-group") : null;
+        if (allBoxes) allBoxes.remove();
 
         console.log("PnPCalib: order cycled, new points_3d=", JSON.stringify(this.points_3d));
+
+        // 自动重新求解，动态更新所有重投影
+        var allPlaced = this.corners.every(function (c) { return c !== null; });
+        var allSet = this.points_3d.every(function (p) { return p !== null; });
+        if (allPlaced && allSet) {
+            this.solve();
+        }
     };
 
-    /** 穷举 24 种点序排列（后端一次性完成），输出重投影误差 */
+    /** 穷举 24 种点序排列（后端一次性完成），展示全部结果 */
     this.bruteForce = async function () {
         if (!this.active) return;
         if (this.corners.some(function (c) { return c === null; })) {
@@ -617,6 +653,16 @@ function PnPCalib(data, editor) {
         this.errorEl.textContent = "测试中...";
         this.bruteBtn.disabled = true;
         console.log("=== PnP 穷举测试 (后端 24 种点序) ===");
+
+        // 保存原始外参用于恢复
+        var sceneMeta = this.data.meta[scene];
+        if (!this._savedExtrinsic) {
+            this._savedExtrinsic = sceneMeta.calib.camera[camName].extrinsic;
+        }
+        // 保存原始 2D 角点顺序
+        if (!this._originalCorners2d) {
+            this._originalCorners2d = this.corners.slice();
+        }
 
         try {
             var resp = await fetch("/brute_force_pnp", {
@@ -643,56 +689,173 @@ function PnPCalib(data, editor) {
             return;
         }
 
-        // 打印所有结果
+        // 按误差排序，展示全部结果
         var results = data.results;
+        results.sort(function (a, b) { return a.error - b.error; });
+        this._bruteForceResults = results;
+
         for (var i = 0; i < results.length; i++) {
-            var r = results[i];
-            console.log("  [" + r.perm.join(",") + "] error=" + r.error.toFixed(2) + " px" +
-                (r.perm.join(",") === data.best.perm.join(",") ? " ← BEST" : ""));
+            console.log("  #" + (i+1) + " [" + results[i].perm.join(",") + "] error=" + results[i].error.toFixed(2) + " px");
         }
-        console.log("=== 最佳排列: [" + data.best.perm.join(",") + "] 误差=" + data.best.error.toFixed(2) + " px ===");
 
-        var best = data.best;
+        // 渲染全部结果列表
+        this._renderBruteForceList(results, scene, camName);
 
-        if (best.perm && best.extrinsic) {
-            // 应用最佳排列：旋转 points_3d 和 corners 到最佳顺序
-            var orig3d = this.points_3d.slice();
-            var orig2d = this.corners.slice();
-            for (var i = 0; i < 4; i++) {
-                this.points_3d[i] = orig3d[best.perm[i]];
-                this.corners[i] = orig2d[best.perm[i]];
-            }
-
-            // 更新弹窗标签颜色和文字（按最佳排列重排）
-            var allColors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
-            var allLabels = ["P0(左下)", "P1(右下)", "P2(右上)", "P3(左上)"];
-            for (var i = 0; i < 4; i++) {
-                var el = this.wrapper.querySelector(
-                    `.pnp-corner[data-idx="${i}"] b`
-                );
-                if (el) {
-                    el.style.color = allColors[best.perm[i]];
-                    el.textContent = allLabels[best.perm[i]];
-                }
-            }
-
-            // 应用最佳外参
-            var sceneMeta = this.data.meta[scene];
-            var calibData = sceneMeta.calib.camera[camName];
-            calibData.extrinsic = best.extrinsic;
-
-            this.errorEl.textContent = best.error.toFixed(2);
-            this.saveBtn.disabled = false;
-            this.result = { success: true, extrinsic: best.extrinsic, reprojection_error: best.error };
-
-            this._updateUI();
-            this._renderHandles();
-            this.editor.imageContextManager.renderPnpHandles(this.corners);
-            this.editor.imageContextManager.render_2d_image();
-            this._renderReprojected();
-        }
+        // 默认预览最优结果
+        this._previewBruteResult(results[0], scene, camName);
 
         this.bruteBtn.disabled = false;
+    };
+
+    /** 渲染穷举结果列表（全部 24 种） */
+    this._renderBruteForceList = function (results, scene, camName) {
+        var container = this.wrapper.querySelector("#pnp-top4-results");
+        if (!container) return;
+        var list = container.querySelector(".pnp-top4-list");
+        list.innerHTML = "";
+
+        var pnp = this;
+        for (var i = 0; i < results.length; i++) {
+            (function (idx) {
+                var r = results[idx];
+                var item = document.createElement("div");
+                item.className = "pnp-top4-item" + (idx === 0 ? " selected" : "");
+                item.innerHTML =
+                    '<span class="pnp-top4-rank">#' + (idx + 1) + '</span>' +
+                    '<span class="pnp-top4-perm">[' + r.perm.join(",") + ']</span>' +
+                    '<span class="pnp-top4-error">' + r.error.toFixed(2) + ' px</span>';
+
+                // 点击条目 → 实时预览（更新所有重投影）
+                item.addEventListener("click", function () {
+                    list.querySelectorAll(".pnp-top4-item").forEach(function (el) {
+                        el.classList.remove("selected");
+                    });
+                    item.classList.add("selected");
+                    pnp._previewBruteResult(results[idx], scene, camName);
+                });
+
+                list.appendChild(item);
+            })(i);
+        }
+        container.style.display = "block";
+    };
+
+    /** 预览某个穷举结果：应用外参 + 重排角点 + 更新所有重投影 */
+    this._previewBruteResult = function (result, scene, camName) {
+        // 按 result.perm 重排 2D 角点
+        var orig2d = this._originalCorners2d;
+        for (var i = 0; i < 4; i++) {
+            this.corners[i] = orig2d[result.perm[i]];
+        }
+
+        // 应用外参
+        var sceneMeta = this.data.meta[scene];
+        sceneMeta.calib.camera[camName].extrinsic = result.extrinsic;
+
+        this.errorEl.textContent = result.error.toFixed(2);
+        this.result = { success: true, extrinsic: result.extrinsic, reprojection_error: result.error };
+        this.saveBtn.disabled = false;
+
+        // 更新侧边栏 UI
+        this._updateUI();
+        this._renderHandles();
+        this._renderReprojected();
+        this._renderAllBoxes();
+
+        // 更新主图像面板（box editor 重投影 + PnP 手柄）
+        this.editor.imageContextManager.renderPnpHandles(this.corners);
+        this.editor.imageContextManager.render_2d_image();
+
+        // 更新 box editor 焦点 canvas
+        var selBox = this.editor.selected_box;
+        if (selBox && selBox.boxEditor) {
+            selBox.boxEditor.focusImageContext.updateFocusedImageContext(selBox);
+        }
+    };
+
+    /** 在侧边栏 SVG 上绘制所有检测框的重投影（用于验证外参效果） */
+    this._renderAllBoxes = function () {
+        var old = this.svg.querySelector("#pnp-all-boxes-group");
+        if (old) old.remove();
+
+        var calib = this._getActiveCalib();
+        if (!calib) return;
+
+        var boxes = this.data.world.annotation.boxes;
+        if (!boxes || boxes.length === 0) return;
+
+        var ratio = this._getImageSvgRatio();
+        var selectedBox = this.editor.selected_box;
+
+        var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.setAttribute("id", "pnp-all-boxes-group");
+
+        for (var i = 0; i < boxes.length; i++) {
+            var box = boxes[i];
+            var pts = box_to_2d_points(box, calib);
+            if (!pts) continue;
+
+            var isSelected = (box === selectedBox);
+            var color = isSelected ? "#00ff00" : "#ff8800";
+            var opacity = isSelected ? "0.9" : "0.4";
+            var strokeWidth = isSelected ? "2" : "1";
+
+            // 画前面 (+X 面): indices 0-3 → pts[0..7]
+            var frontPts = pts.slice(0, 8);
+            var frontSvg = frontPts.map(function (v, idx) {
+                return (idx % 2 === 0) ? v * ratio.x : v * ratio.y;
+            });
+            var polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            polygon.setAttribute("points", frontSvg.join(","));
+            polygon.setAttribute("fill", color);
+            polygon.setAttribute("fill-opacity", opacity);
+            polygon.setAttribute("stroke", color);
+            polygon.setAttribute("stroke-width", strokeWidth);
+            g.appendChild(polygon);
+
+            // 画后面 (-X 面): indices 4-7 → pts[8..15]
+            var rearPts = pts.slice(8, 16);
+            var rearSvg = rearPts.map(function (v, idx) {
+                return (idx % 2 === 0) ? v * ratio.x : v * ratio.y;
+            });
+            var polygon2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            polygon2.setAttribute("points", rearSvg.join(","));
+            polygon2.setAttribute("fill", "none");
+            polygon2.setAttribute("stroke", color);
+            polygon2.setAttribute("stroke-width", strokeWidth);
+            polygon2.setAttribute("stroke-dasharray", "4,4");
+            g.appendChild(polygon2);
+
+            // 连接前后面对应边
+            for (var j = 0; j < 4; j++) {
+                var x1 = pts[j * 2] * ratio.x, y1 = pts[j * 2 + 1] * ratio.y;
+                var x2 = pts[(j + 4) * 2] * ratio.x, y2 = pts[(j + 4) * 2 + 1] * ratio.y;
+                var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+                line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+                line.setAttribute("stroke", color);
+                line.setAttribute("stroke-width", "1");
+                line.setAttribute("stroke-opacity", opacity);
+                g.appendChild(line);
+            }
+
+            // 标注 track id
+            if (box.obj_track_id) {
+                var cx = (pts[0] * ratio.x + pts[4] * ratio.x) / 2;
+                var cy = (pts[1] * ratio.y + pts[5] * ratio.y) / 2;
+                var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                label.setAttribute("x", cx);
+                label.setAttribute("y", cy - 6);
+                label.setAttribute("fill", color);
+                label.setAttribute("font-size", "11");
+                label.setAttribute("font-family", "monospace");
+                label.setAttribute("text-anchor", "middle");
+                label.appendChild(document.createTextNode(box.obj_type + " " + box.obj_track_id));
+                g.appendChild(label);
+            }
+        }
+
+        this.svg.appendChild(g);
     };
 
     /** 重置所有角点（重新选择 3D 角点） */
@@ -703,6 +866,12 @@ function PnPCalib(data, editor) {
         this.corners = [null, null, null, null];
         this.points_3d = [null, null, null, null];
         this.result = null;
+        this._originalCorners2d = null;
+        this._bruteForceResults = null;
+
+        // 隐藏 top-4 结果
+        var top4 = this.wrapper ? this.wrapper.querySelector("#pnp-top4-results") : null;
+        if (top4) top4.style.display = "none";
 
         // 重新创建 3D 角点标记（重置选择状态）
         var box = this.editor.selected_box;
@@ -718,6 +887,8 @@ function PnPCalib(data, editor) {
         // 清除重投影标记
         var reproj = this.svg ? this.svg.querySelector("#pnp-reprojected-group") : null;
         if (reproj) reproj.remove();
+        var allBoxes = this.svg ? this.svg.querySelector("#pnp-all-boxes-group") : null;
+        if (allBoxes) allBoxes.remove();
     };
 
     // ── 内部工具 ──────────────────────────────────────────────────────────

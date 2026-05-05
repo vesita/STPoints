@@ -1083,16 +1083,15 @@
 				</div>
 				
 
-				<div id="pnp-calib-wrapper" class="popup-window-wrapper" tabindex="-1">
-					<div id="view">
-						<div id="header">
-							<span id="title">PnP 外参矫正</span>
-							<div id="buttons">
-								<div id="pnp-calib-exit" class="ui-button" title="关闭">
-									<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
-										<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
-									</g></svg>
-								</div>
+				<!-- PnP 标定侧边栏 -->
+				<div id="pnp-sidebar-wrapper" style="display:none">
+					<div id="pnp-sidebar">
+						<div id="pnp-sidebar-header">
+							<span>PnP 外参矫正</span>
+							<div id="pnp-calib-exit" class="ui-button" title="关闭">
+								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
+									<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
+								</g></svg>
 							</div>
 						</div>
 						<div id="pnp-calib-body">
@@ -1117,10 +1116,13 @@
 									<button id="pnp-calib-save" class="pnp-btn pnp-btn-save" disabled>保存</button>
 								</div>
 								<div class="pnp-error">重投影误差: <span id="pnp-calib-error">--</span> px</div>
+								<div id="pnp-top4-results" style="display:none">
+									<div class="pnp-top4-header">穷举结果 (24种排列，按误差排序，点击预览):</div>
+									<div class="pnp-top4-list"></div>
+								</div>
 							</div>
 							<div class="pnp-footer">
-								在 3D 点云视图中依次点击 box 的 4 个角点(选为 P0-P3)，2D 位置自动投影后可拖拽微调，再点击「计算 PnP」<br/>
-								<span style="color:#ff6666">红(P0)</span> <span style="color:#66ff66">绿(P1)</span> <span style="color:#6666ff">蓝(P2)</span> <span style="color:#ffff66">黄(P3)</span> &nbsp;—&nbsp; 可选任意 4 个角点，不必限于同一面
+								<span style="color:#ff6666">红(P0)</span> <span style="color:#66ff66">绿(P1)</span> <span style="color:#6666ff">蓝(P2)</span> <span style="color:#ffff66">黄(P3)</span>
 							</div>
 						</div>
 					</div>

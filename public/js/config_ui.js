@@ -250,18 +250,26 @@ class ConfigUi{
         this.editorCfg = editor.editorCfg;
         this.dataCfg = editor.data.cfg;
         this.menu = this.wrapper.querySelector("#config-menu");
-        
+
+        if (!this.button || !this.wrapper || !this.menu) {
+            console.warn("ConfigUi: missing required DOM elements",
+                {button: !!this.button, wrapper: !!this.wrapper, menu: !!this.menu});
+            return;
+        }
+
         this.wrapper.onclick = ()=>{
             this.hide();
         }
 
-        this.button.onclick = (event)=>{            
-            this.show(event.currentTarget);            
+        this.button.onclick = (event)=>{
+            this.show(event.currentTarget);
         }
 
         for (let item in this.clickableItems)
         {
-            this.menu.querySelector(item).onclick = (event)=>{
+            let el = this.menu.querySelector(item);
+            if (!el) { console.warn("ConfigUi: missing clickable element", item); continue; }
+            el.onclick = (event)=>{
                 let ret = this.clickableItems[item](event);
                 if (ret)
                 {
@@ -274,7 +282,9 @@ class ConfigUi{
 
         for (let item in this.changeableItems)
         {
-            this.menu.querySelector(item).onchange = (event)=>{
+            let el = this.menu.querySelector(item);
+            if (!el) { console.warn("ConfigUi: missing changeable element", item); continue; }
+            el.onchange = (event)=>{
                 let ret = this.changeableItems[item](event);
                 if (ret)
                 {
@@ -286,25 +296,29 @@ class ConfigUi{
         }
 
         this.ignoreItems.forEach(item=>{
-            this.menu.querySelector(item).onclick = (event)=>{
+            let el = this.menu.querySelector(item);
+            if (!el) { console.warn("ConfigUi: missing ignore element", item); return; }
+            el.onclick = (event)=>{
                 {
-                    event.stopPropagation();                    
+                    event.stopPropagation();
                 }
             }
         });
 
         this.subMenus.forEach(item=>{
-            this.menu.querySelector(item).onmouseenter = function(event){
+            let el = this.menu.querySelector(item);
+            if (!el) { console.warn("ConfigUi: missing submenu element", item); return; }
+            el.onmouseenter = function(event){
                 if (this.timerId)
                 {
                     clearTimeout(this.timerId);
                     this.timerId = null;
                 }
-                
+
                 event.currentTarget.querySelector(item +"-submenu").style.display="inherit";
             }
 
-            this.menu.querySelector(item).onmouseleave = function(event){
+            el.onmouseleave = function(event){
                 let ui = event.currentTarget.querySelector(item +"-submenu");
                 this.timerId = setTimeout(()=>{
                     ui.style.display="none";
@@ -315,25 +329,26 @@ class ConfigUi{
         });
 
         this.menu.onclick = (event)=>{
-            event.stopPropagation();                    
+            event.stopPropagation();
         };
 
 
 
         // init ui
-        this.menu.querySelector("#cfg-theme-select").value = pointsGlobalConfig.theme;
-        this.menu.querySelector("#cfg-data-aux-lidar-checkbox").checked = pointsGlobalConfig.enableAuxLidar;
-        this.menu.querySelector("#cfg-data-radar-checkbox").checked = pointsGlobalConfig.enableRadar;
-        this.menu.querySelector("#cfg-color-points-select").value = pointsGlobalConfig.color_points;
-        this.menu.querySelector("#cfg-coordinate-system-select").value = pointsGlobalConfig.coordinateSystem;
-        this.menu.querySelector("#cfg-batch-mode-inst-number").value = pointsGlobalConfig.batchModeInstNumber;
-        this.menu.querySelector("#cfg-data-filter-points-checkbox").checked = pointsGlobalConfig.enableFilterPoints;
-        this.menu.querySelector("#cfg-data-filter-points-z").value = pointsGlobalConfig.filterPointsZ;
-        this.menu.querySelector("#cfg-hide-id-checkbox").value = pointsGlobalConfig.hideId;
-        this.menu.querySelector("#cfg-hide-category-checkbox").value = pointsGlobalConfig.hideCategory;
-        this.menu.querySelector("#cfg-data-preload-checkbox").checked = pointsGlobalConfig.enablePreload;
-        this.menu.querySelector("#cfg-auto-rotate-xy-checkbox").checked = pointsGlobalConfig.enableAutoRotateXY;
-        this.menu.querySelector("#cfg-auto-update-interpolated-boxes-checkbox").checked = pointsGlobalConfig.autoUpdateInterpolatedBoxes;
+        let setVal = (sel, prop, val) => { let el = this.menu.querySelector(sel); if (el) el[prop] = val; };
+        setVal("#cfg-theme-select", "value", pointsGlobalConfig.theme);
+        setVal("#cfg-data-aux-lidar-checkbox", "checked", pointsGlobalConfig.enableAuxLidar);
+        setVal("#cfg-data-radar-checkbox", "checked", pointsGlobalConfig.enableRadar);
+        setVal("#cfg-color-points-select", "value", pointsGlobalConfig.color_points);
+        setVal("#cfg-coordinate-system-select", "value", pointsGlobalConfig.coordinateSystem);
+        setVal("#cfg-batch-mode-inst-number", "value", pointsGlobalConfig.batchModeInstNumber);
+        setVal("#cfg-data-filter-points-checkbox", "checked", pointsGlobalConfig.enableFilterPoints);
+        setVal("#cfg-data-filter-points-z", "value", pointsGlobalConfig.filterPointsZ);
+        setVal("#cfg-hide-id-checkbox", "value", pointsGlobalConfig.hideId);
+        setVal("#cfg-hide-category-checkbox", "value", pointsGlobalConfig.hideCategory);
+        setVal("#cfg-data-preload-checkbox", "checked", pointsGlobalConfig.enablePreload);
+        setVal("#cfg-auto-rotate-xy-checkbox", "checked", pointsGlobalConfig.enableAutoRotateXY);
+        setVal("#cfg-auto-update-interpolated-boxes-checkbox", "checked", pointsGlobalConfig.autoUpdateInterpolatedBoxes);
     }
 
 

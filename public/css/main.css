@@ -1216,22 +1216,39 @@ td {
 		 1px  1px 0 #000;
 }
 
-/* ── PnP Calibration Popup ─────────────────────── */
+/* ── PnP Calibration Sidebar ────────────────────── */
 
-#pnp-calib-wrapper #view {
-	left: 10%;
-	top: 10%;
-	width: 80%;
-	height: 80%;
+#pnp-sidebar-wrapper {
+	position: fixed;
+	top: 0;
+	right: 0;
+	width: 420px;
+	height: 100vh;
+	z-index: 1000;
+	background: var(--window-background-color);
+	border-left: 1px solid var(--widget-background-color);
+	box-shadow: -2px 0 8px rgba(0,0,0,0.3);
 	display: flex;
 	flex-direction: column;
 }
 
-#pnp-calib-wrapper #header {
+#pnp-sidebar-wrapper #pnp-sidebar {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+#pnp-sidebar-wrapper #pnp-sidebar-header {
 	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 12px;
+	background: var(--window-background-color);
+	border-bottom: 1px solid var(--widget-background-color);
 	cursor: grab;
 }
-#pnp-calib-wrapper #header:active {
+#pnp-sidebar-wrapper #pnp-sidebar-header:active {
 	cursor: grabbing;
 }
 
@@ -1321,4 +1338,61 @@ td {
 		 1px -1px 0 #000,
 		-1px  1px 0 #000,
 		 1px  1px 0 #000;
+}
+
+/* ── PnP Brute Force Results ────────────────────── */
+
+#pnp-top4-results {
+	flex-shrink: 0;
+	max-height: 180px;
+	overflow-y: auto;
+	background: var(--window-background-color);
+	border-top: 1px solid var(--widget-background-color);
+	padding: 4px 8px;
+}
+
+.pnp-top4-title {
+	font-size: 11px;
+	color: var(--widget-color);
+	margin-bottom: 4px;
+}
+
+.pnp-top4-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.pnp-top4-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 3px 6px;
+	font-size: 11px;
+	font-family: monospace;
+	cursor: pointer;
+	border-radius: 3px;
+	color: var(--widget-color);
+}
+
+.pnp-top4-item:hover {
+	background: var(--widget-background-color);
+}
+
+.pnp-top4-item.selected {
+	background: var(--widget-background-color);
+	font-weight: bold;
+}
+
+.pnp-top4-rank {
+	color: #888;
+	width: 28px;
+}
+
+.pnp-top4-perm {
+	width: 60px;
+}
+
+.pnp-top4-error {
+	color: #4caf50;
 }
