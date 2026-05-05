@@ -67,6 +67,7 @@ function PnPCalib(data, editor) {
         }
         this.errorEl = ctrl.querySelector("#pnp-calib-error");
         this.solveBtn = ctrl.querySelector("#pnp-calib-solve");
+        this.manual3dBtn = ctrl.querySelector("#pnp-calib-manual-3d");
         this.cycleBtn = ctrl.querySelector("#pnp-calib-cycle");
         this.bruteBtn = ctrl.querySelector("#pnp-calib-brute");
         this.resetBtn = ctrl.querySelector("#pnp-calib-reset");
@@ -74,6 +75,7 @@ function PnPCalib(data, editor) {
 
         var pnp = this;
         this.solveBtn.onclick = function () { pnp.solve(); };
+        this.manual3dBtn.onclick = function () { pnp.startManual3DSelection(); };
         this.cycleBtn.onclick = function () { pnp.cycleOrder(); };
         this.bruteBtn.onclick = function () { pnp.bruteForce(); };
         this.resetBtn.onclick = function () { pnp.reset(); };
@@ -359,6 +361,66 @@ function PnPCalib(data, editor) {
         console.log("PnPCalib: entered, points_3d=", this.points_3d);
     };
 
+    /** 开始手动选择 3D 点模式 */
+    this.startManual3DSelection = function () {
+        if (!this.active) return;
+
+        // 重置 3D 点
+        this.points_3d = [null, null, null, null];
+        this._manualPickIndex = 0;
+
+        // 移除现有的 3D 角点标记
+        this._remove3DCornerMarkers();
+
+        // 更新按钮状态
+        this.manual3dBtn.textContent = "选择 P0...";
+        this.manual3dBtn.disabled = true;
+
+        // 设置测量工具的回调
+        var pnp = this;
+        this.editor.measureTool.onPick = function (point) {
+            pnp._onManual3DPointPicked(point);
+        };
+
+        // 进入测量模式
+        this.editor.measureTool.start();
+
+        this._updateUI();
+        console.log("PnPCalib: started manual 3D selection");
+    };
+
+    /** 手动选择了一个 3D 点 */
+    this._onManual3DPointPicked = function (point) {
+        if (this._manualPickIndex >= 4) return;
+
+        var idx = this._manualPickIndex;
+        this.points_3d[idx] = [point.x, point.y, point.z];
+
+        console.log("PnPCalib: manual 3D point P" + idx + "=" +
+            point.x.toFixed(3) + "," + point.y.toFixed(3) + "," + point.z.toFixed(3));
+
+        this._manualPickIndex++;
+
+        // 更新按钮文本
+        if (this._manualPickIndex < 4) {
+            this.manual3dBtn.textContent = "选择 P" + this._manualPickIndex + "...";
+        } else {
+            // 4个点都选完了
+            this.editor.measureTool.stop();
+            this.editor.measureTool.onPick = null;
+            this.manual3dBtn.textContent = "手动选点";
+            this.manual3dBtn.disabled = false;
+
+            // 如果2D点也已经设置好了，自动求解
+            var allCornersPlaced = this.corners.every(function (c) { return c !== null; });
+            if (allCornersPlaced) {
+                this.solve();
+            }
+        }
+
+        this._updateUI();
+    };
+
     /** 退出 PnP 标定模式 */
     this.exit = function () {
         this.active = false;
@@ -366,6 +428,13 @@ function PnPCalib(data, editor) {
         this.points_3d = null;
         this.result = null;
         this._draggingIdx = -1;
+        this._manualPickIndex = 0;
+
+        // 停止测量模式并清理回调
+        if (this.editor.measureTool) {
+            this.editor.measureTool.stop();
+            this.editor.measureTool.onPick = null;
+        }
 
         if (this.wrapper) {
             this.wrapper.style.display = "none";
@@ -909,6 +978,19 @@ function PnPCalib(data, editor) {
         this.result = null;
         this._originalCorners2d = null;
         this._bruteForceResults = null;
+        this._manualPickIndex = 0;
+
+        // 停止测量模式并清理回调
+        if (this.editor.measureTool) {
+            this.editor.measureTool.stop();
+            this.editor.measureTool.onPick = null;
+        }
+
+        // 恢复手动选点按钮状态
+        if (this.manual3dBtn) {
+            this.manual3dBtn.textContent = "手动选点";
+            this.manual3dBtn.disabled = false;
+        }
 
         // 隐藏 top-4 结果
         var top4 = this.wrapper ? this.wrapper.querySelector("#pnp-top4-results") : null;

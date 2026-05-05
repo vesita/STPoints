@@ -11,6 +11,7 @@ class MeasureTool {
         this.line = null;
         this.labelEl = null;
         this.raycaster = new THREE.Raycaster();
+        this.onPick = null; // 回调函数，用于 PnP 等外部模块接收选择的点
         // 初始化 Points threshold
         if (!this.raycaster.params.Points) {
             this.raycaster.params.Points = {};
@@ -58,6 +59,13 @@ class MeasureTool {
 
         console.log("MeasureTool: addPoint", point, "current count:", this.points.length);
 
+        // 如果有回调函数（PnP 模式），调用回调
+        if (this.onPick) {
+            this.onPick(point);
+            return;
+        }
+
+        // 正常测量模式
         this.points.push(point);
         this._addMarker(point);
 
