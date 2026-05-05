@@ -44,8 +44,8 @@ class MeasureTool {
         if (!this.measuring) return;
 
         var world = this.editor.data.world;
-        if (!world || !world.lidar || !world.lidar.points) {
-            this._showStatus("无点云数据");
+        if (!world) {
+            this._showStatus("无世界数据");
             return;
         }
 
@@ -55,15 +55,24 @@ class MeasureTool {
             return;
         }
 
+        console.log("MeasureTool: addPoint", point, "current count:", this.points.length);
+
         this.points.push(point);
         this._addMarker(point);
 
         if (this.points.length === 1) {
             this._showStatus("已拾取第1个点，继续点击拾取第2个点");
         } else if (this.points.length === 2) {
-            this._drawLine();
-            this._showDistance();
+            try {
+                this._drawLine();
+                this._showDistance();
+            } catch (e) {
+                console.error("MeasureTool: error drawing line", e);
+                this._showStatus("距离: 计算中...");
+                this._calcDistance();
+            }
         } else {
+            // 超过2个点，重新开始
             this.clear();
             this.points.push(point);
             this._addMarker(point);
@@ -95,32 +104,39 @@ class MeasureTool {
 
     _pickPoint(screenPos) {
         var world = this.editor.data.world;
-        var points = world.lidar.points;
-
-        console.log("MeasureTool: picking point, screenPos=", screenPos);
-        console.log("MeasureTool: points object=", points);
 
         // screenPos 已经是 NDC 坐标 (-1 到 1)
         var mouse = new THREE.Vector2(screenPos.x, screenPos.y);
 
-        this.raycaster.setFromCamera(mouse, this.editor.viewManager.mainView.camera);
-        console.log("MeasureTool: raycaster origin=", this.raycaster.ray.origin, "dir=", this.raycaster.ray.direction);
+        // 尝试从点云拾取
+        if (world.lidar && world.lidar.points) {
+            this.raycaster.setFromCamera(mouse, this.editor.viewManager.mainView.camera);
+            this.raycaster.params.Points.threshold = 1.0;
+            var intersects = this.raycaster.intersectObjects([world.lidar.points], false);
 
-        // 增大拾取阈值
-        this.raycaster.params.Points.threshold = 1.0;
-        var intersects = this.raycaster.intersectObjects([points], false);
-        console.log("MeasureTool: intersects count=", intersects.length);
-
-        if (intersects.length > 0) {
-            var p = intersects[0].point;
-            console.log("MeasureTool: picked point from cloud", p);
-            return { x: p.x, y: p.y, z: p.z };
+            if (intersects.length > 0) {
+                var p = intersects[0].point;
+                console.log("MeasureTool: picked from cloud", p);
+                return { x: p.x, y: p.y, z: p.z };
+            }
         }
 
         // 备选：使用鼠标在 z=0 平面上的投影
-        var fallback = this.editor.mouse.get_mouse_location_in_world();
-        console.log("MeasureTool: using fallback point", fallback);
-        return fallback;
+        console.log("MeasureTool: using z=0 plane fallback");
+        return this.editor.mouse.get_mouse_location_in_world();
+    }
+
+    _calcDistance() {
+        if (this.points.length < 2) return;
+
+        var p1 = this.points[0];
+        var p2 = this.points[1];
+        var dx = p2.x - p1.x;
+        var dy = p2.y - p1.y;
+        var dz = p2.z - p1.z;
+        var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        this._showStatus("距离: " + dist.toFixed(3) + " m  (dx=" + dx.toFixed(3) + " dy=" + dy.toFixed(3) + " dz=" + dz.toFixed(3) + ")");
     }
 
     _addMarker(p) {
@@ -137,14 +153,34 @@ class MeasureTool {
 
     _drawLine() {
         var world = this.editor.data.world;
+        if (!world || !world.scene) {
+            console.error("MeasureTool: world or scene not available");
+            return;
+        }
+
         var p1 = this.points[0];
         var p2 = this.points[1];
 
-        this.line = world.new_line(
-            [p1.x, p1.y, p1.z],
-            [p2.x, p2.y, p2.z],
-            0xffff00
-        );
+        try {
+            this.line = world.new_line(
+                [p1.x, p1.y, p1.z],
+                [p2.x, p2.y, p2.z],
+                0xffff00
+            );
+            world.scene.add(this.line);
+        } catch (e) {
+            console.error("MeasureTool: error in new_line", e);
+            // 备用方案：手动创建线
+            this._drawLineFallback(p1, p2, world);
+        }
+    }
+
+    _drawLineFallback(p1, p2, world) {
+        var geometry = new THREE.BufferGeometry();
+        var vertices = new Float32Array([p1.x, p1.y, p1.z, p2.x, p2.y, p2.z]);
+        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        var material = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2 });
+        this.line = new THREE.LineSegments(geometry, material);
         world.scene.add(this.line);
     }
 
