@@ -111,12 +111,15 @@ class MeasureTool {
         // 尝试从点云拾取
         if (world.lidar && world.lidar.points) {
             this.raycaster.setFromCamera(mouse, this.editor.viewManager.mainView.camera);
-            this.raycaster.params.Points.threshold = 1.0;
+
+            // 使用较小的 threshold 提高精度
+            this.raycaster.params.Points.threshold = 0.3;
             var intersects = this.raycaster.intersectObjects([world.lidar.points], false);
 
             if (intersects.length > 0) {
+                // 选择距离相机最近的点（第一个交点）
                 var p = intersects[0].point;
-                console.log("MeasureTool: picked from cloud", p);
+                console.log("MeasureTool: picked from cloud, distance:", intersects[0].distance.toFixed(2));
                 return { x: p.x, y: p.y, z: p.z };
             }
         }
@@ -142,7 +145,8 @@ class MeasureTool {
     _addMarker(p) {
         var world = this.editor.data.world;
 
-        var geometry = new THREE.SphereGeometry(0.15, 16, 16);
+        // 使用更小的标记点
+        var geometry = new THREE.SphereGeometry(0.05, 8, 8);
         var material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         var sphere = new THREE.Mesh(geometry, material);
         sphere.position.set(p.x, p.y, p.z);
