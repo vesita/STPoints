@@ -626,13 +626,42 @@ class ImageContext extends MovableView{
 
         // active img is set by global, it's not set sometimes.
         var img = this.world.cameras.getImageByName(this.name);
-        if (img){
-            svgimage.setAttribute("xlink:href", img.src);
-        }
+        if (!img) return;
 
         this.img = img;
 
-
+        // 去畸变模式
+        var mgr = this._manager;
+        if (mgr && mgr._undistorted) {
+            var camName = this.name;
+            var cacheKey = this.world.frameInfo.scene + "/" + camName + "/" + this.world.frameInfo.frame;
+            if (mgr._undistortCache[cacheKey]) {
+                svgimage.setAttribute("xlink:href", mgr._undistortCache[cacheKey]);
+            } else {
+                var url = "/undistort?scene=" + encodeURIComponent(this.world.frameInfo.scene)
+                    + "&camera=" + encodeURIComponent(camName)
+                    + "&frame=" + encodeURIComponent(this.world.frameInfo.frame);
+                var self = this;
+                fetch(url).then(function(resp) {
+                    if (!resp.ok) return resp.text().then(function(t) { throw new Error(t); });
+                    return resp.blob();
+                }).then(function(blob) {
+                    var dataUrl = URL.createObjectURL(blob);
+                    mgr._undistortCache[cacheKey] = dataUrl;
+                    // 确认仍在去畸变模式
+                    if (mgr._undistorted) {
+                        svgimage.setAttribute("xlink:href", dataUrl);
+                    }
+                }).catch(function(e) {
+                    console.warn("Undistort failed, using original:", e);
+                    svgimage.setAttribute("xlink:href", img.src);
+                });
+                // 先用原图占位
+                svgimage.setAttribute("xlink:href", img.src);
+            }
+        } else {
+            svgimage.setAttribute("xlink:href", img.src);
+        }
     }
 
 
@@ -969,6 +998,8 @@ class ImageContextManager {
         this.selectorUi = selectorUi;
         this.cfg = cfg;
         this.on_img_click = on_img_click;
+        this._undistorted = false;
+        this._undistortCache = {}; // camName -> dataURL
 
         this.addImage("", true);
 
@@ -1075,6 +1106,7 @@ class ImageContextManager {
             name = this.bestCamera;
             
         let image = new ImageContext(this.parentUi, name, autoSwitch, this.cfg, this.on_img_click);
+        image._manager = this;
 
         this.images.push(image);
 
@@ -1126,6 +1158,15 @@ class ImageContextManager {
 
         this.world = world;
         this.images.forEach(i=>i.attachWorld(world));
+    }
+
+    toggleUndistort(){
+        this._undistorted = !this._undistorted;
+        // 重新加载所有图片
+        this.images.forEach(i => i.show_image());
+        // 通知 PnP 面板重新加载（如果打开）
+        if (this._onUndistortToggle) this._onUndistortToggle();
+        return this._undistorted;
     }
 
     hide(){

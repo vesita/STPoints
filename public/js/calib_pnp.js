@@ -307,23 +307,46 @@ function PnPCalib(data, editor) {
             var camName = this._getActiveCameraName();
             if (!camName) return;
             var img = this.data.world.cameras.getImageByName(camName);
-            if (img) {
-                var pnp = this;
-                // 设置 SVG viewBox 匹配图片自然尺寸
-                var w = img.naturalWidth || 2048;
-                var h = img.naturalHeight || 1536;
-                this.svg.setAttribute("viewBox", "0 0 " + w + " " + h);
-                this.imageEl.setAttribute("width", w);
-                this.imageEl.setAttribute("height", h);
+            if (!img) return;
+            var pnp = this;
+
+            // 设置 SVG viewBox 匹配图片自然尺寸
+            var w = img.naturalWidth || 2048;
+            var h = img.naturalHeight || 1536;
+            this.svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+            this.imageEl.setAttribute("width", w);
+            this.imageEl.setAttribute("height", h);
+
+            // 检查去畸变模式
+            var mgr = this.editor && this.editor.imageContextManager;
+            if (mgr && mgr._undistorted) {
+                var fi = this.data.world.frameInfo;
+                var url = "/undistort?scene=" + encodeURIComponent(fi.scene)
+                    + "&camera=" + encodeURIComponent(camName)
+                    + "&frame=" + encodeURIComponent(fi.frame);
+                var resp = fetch(url).then(function(r) {
+                    if (!r.ok) throw new Error(r.statusText);
+                    return r.blob();
+                }).then(function(blob) {
+                    var dataUrl = URL.createObjectURL(blob);
+                    pnp.imageEl.setAttribute("xlink:href", dataUrl);
+                }).catch(function(e) {
+                    console.warn("PnPCalib: undistort failed, using original", e);
+                    pnp.imageEl.setAttribute("xlink:href", img.src);
+                });
+                // 先用原图占位
                 this.imageEl.setAttribute("xlink:href", img.src);
-                // 图片可能已缓存加载完成，手动触发尺寸更新
-                if (img.complete) {
-                    var nw = img.naturalWidth || 2048;
-                    var nh = img.naturalHeight || 1536;
-                    pnp.svg.setAttribute("viewBox", "0 0 " + nw + " " + nh);
-                    pnp.imageEl.setAttribute("width", nw);
-                    pnp.imageEl.setAttribute("height", nh);
-                }
+            } else {
+                this.imageEl.setAttribute("xlink:href", img.src);
+            }
+
+            // 图片可能已缓存加载完成，手动触发尺寸更新
+            if (img.complete) {
+                var nw = img.naturalWidth || 2048;
+                var nh = img.naturalHeight || 1536;
+                pnp.svg.setAttribute("viewBox", "0 0 " + nw + " " + nh);
+                pnp.imageEl.setAttribute("width", nw);
+                pnp.imageEl.setAttribute("height", nh);
             }
         } catch (e) {
             console.warn("PnPCalib: failed to load image", e);

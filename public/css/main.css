@@ -1426,6 +1426,18 @@ td {
 	color: var(--highlight-color, yellow);
 }
 
+#undistort-button {
+	cursor: pointer;
+}
+
+#undistort-button.active {
+	background: var(--highlight-background-color, #555);
+}
+
+#undistort-button.active svg {
+	color: var(--highlight-color, cyan);
+}
+
 #measure-status {
 	position: absolute;
 	bottom: 30px;

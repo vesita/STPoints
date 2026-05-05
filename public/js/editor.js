@@ -93,6 +93,16 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
             });
         }
 
+        // 去畸变按钮事件绑定
+        var undistortBtn = editorUi.querySelector("#undistort-button");
+        if (undistortBtn) {
+            undistortBtn.addEventListener("click", function() {
+                if (!self.data || !self.data.world) return;
+                var active = self.imageContextManager.toggleUndistort();
+                undistortBtn.classList.toggle("active", active);
+            });
+        }
+
         this.header = new Header(editorUi.querySelector("#header"), this.data, this.editorCfg,
             (e)=>{
                 this.scene_changed(e.currentTarget.value);
@@ -132,10 +142,18 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         
 
         this.imageContextManager = new ImageContextManager(
-                this.editorUi.querySelector("#content"), 
+                this.editorUi.querySelector("#content"),
                 this.editorUi.querySelector("#camera-selector"),
                 this.editorCfg,
                 (lidar_points)=>this.on_img_click(lidar_points));
+
+        // 去畸变切换时通知 PnP 面板
+        var pnpCalib = this.pnpCalib;
+        this.imageContextManager._onUndistortToggle = function() {
+            if (pnpCalib && pnpCalib.active) {
+                pnpCalib._loadImage();
+            }
+        };
 
 
         if (!this.editorCfg.disableRangeCircle)

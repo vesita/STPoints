@@ -4,6 +4,8 @@ import string
 import cherrypy
 import os
 import json
+import cv2
+import numpy as np
 from jinja2 import Environment, FileSystemLoader
 env = Environment(loader=FileSystemLoader('./'))
 
@@ -378,6 +380,51 @@ class Root(object):
             json.dump(calib_data, f, indent=2)
 
         return {"success": True}
+
+    @cherrypy.expose
+    def undistort(self, scene="", camera="", frame=""):
+        """返回去畸变后的图像。若标定文件中无 dist_coeffs 则返回原图。"""
+        if not scene or not camera or not frame:
+            cherrypy.response.status = 400
+            return b"missing parameters"
+
+        # 读取标定文件
+        calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
+        if not os.path.isfile(calib_file):
+            cherrypy.response.status = 404
+            return b"calib file not found"
+
+        with open(calib_file) as f:
+            calib = json.load(f)
+
+        intrinsic = calib.get("intrinsic")
+        dist_coeffs = calib.get("dist_coeffs")
+
+        # 无畸变系数 → 重定向到原图
+        scene_meta = scene_reader.get_one_scene(scene)
+        cam_ext = scene_meta.get("camera_ext", ".jpg")
+        img_path = os.path.join("./data", scene, "camera", camera, frame + cam_ext)
+
+        if not dist_coeffs or not intrinsic:
+            raise cherrypy.HTTPRedirect(img_path)
+
+        # 读取原始图像
+        img = cv2.imread(img_path)
+        if img is None:
+            cherrypy.response.status = 404
+            return b"image not found"
+
+        # 构建相机矩阵和畸变系数
+        K = np.array(intrinsic, dtype=np.float64).reshape(3, 3)
+        D = np.array(dist_coeffs, dtype=np.float64)
+
+        # 去畸变
+        undistorted = cv2.undistort(img, K, D)
+
+        # 返回 JPEG
+        _, buf = cv2.imencode('.jpg', undistorted)
+        cherrypy.response.headers['Content-Type'] = 'image/jpeg'
+        return buf.tobytes()
 
 
 if __name__ == '__main__':
