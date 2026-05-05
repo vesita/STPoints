@@ -61,14 +61,13 @@ class MeasureTool {
         this._addMarker(point);
 
         if (this.points.length === 1) {
-            this._showStatus("已拾取第1个点，继续点击拾取第2个点");
+            this._showPointInfo(1, point);
         } else if (this.points.length === 2) {
             try {
                 this._drawLine();
                 this._showDistance();
             } catch (e) {
                 console.error("MeasureTool: error drawing line", e);
-                this._showStatus("距离: 计算中...");
                 this._calcDistance();
             }
         } else {
@@ -76,7 +75,7 @@ class MeasureTool {
             this.clear();
             this.points.push(point);
             this._addMarker(point);
-            this._showStatus("已拾取第1个点，继续点击拾取第2个点");
+            this._showPointInfo(1, point);
         }
 
         this.editor.render();
@@ -196,7 +195,15 @@ class MeasureTool {
         var dz = p2.z - p1.z;
         var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-        this._showStatus("距离: " + dist.toFixed(3) + " m  (dx=" + dx.toFixed(3) + " dy=" + dy.toFixed(3) + " dz=" + dz.toFixed(3) + ")");
+        var msg = "P1:(" + p1.x.toFixed(2) + ", " + p1.y.toFixed(2) + ", " + p1.z.toFixed(2) + ")  " +
+                  "P2:(" + p2.x.toFixed(2) + ", " + p2.y.toFixed(2) + ", " + p2.z.toFixed(2) + ")  " +
+                  "距离: " + dist.toFixed(3) + " m";
+        this._showStatus(msg);
+    }
+
+    _showPointInfo(index, point) {
+        var msg = "P" + index + ": (" + point.x.toFixed(2) + ", " + point.y.toFixed(2) + ", " + point.z.toFixed(2) + ")";
+        this._showStatus(msg);
     }
 
     _updateUI() {
