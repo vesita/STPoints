@@ -10,7 +10,11 @@ class MeasureTool {
         this.line = null;
         this.labelEl = null;
         this.raycaster = new THREE.Raycaster();
-        this.raycaster.params.Points.threshold = 0.3;
+        // 初始化 Points threshold
+        if (!this.raycaster.params.Points) {
+            this.raycaster.params.Points = {};
+        }
+        this.raycaster.params.Points.threshold = 1.0;
     }
 
     start() {
@@ -93,32 +97,39 @@ class MeasureTool {
         var world = this.editor.data.world;
         var points = world.lidar.points;
 
-        // 转换屏幕坐标到 NDC
-        var mouse = new THREE.Vector2();
-        mouse.x = screenPos.x;
-        mouse.y = screenPos.y;
+        console.log("MeasureTool: picking point, screenPos=", screenPos);
+        console.log("MeasureTool: points object=", points);
+
+        // screenPos 已经是 NDC 坐标 (-1 到 1)
+        var mouse = new THREE.Vector2(screenPos.x, screenPos.y);
 
         this.raycaster.setFromCamera(mouse, this.editor.viewManager.mainView.camera);
+        console.log("MeasureTool: raycaster origin=", this.raycaster.ray.origin, "dir=", this.raycaster.ray.direction);
+
+        // 增大拾取阈值
+        this.raycaster.params.Points.threshold = 1.0;
         var intersects = this.raycaster.intersectObjects([points], false);
+        console.log("MeasureTool: intersects count=", intersects.length);
 
         if (intersects.length > 0) {
             var p = intersects[0].point;
-            // 转换回 LiDAR 坐标系
-            return world.scenePosToLidar(p);
+            console.log("MeasureTool: picked point from cloud", p);
+            return { x: p.x, y: p.y, z: p.z };
         }
 
-        // 备选：使用 z=0 平面交点
-        return this.editor.mouse.get_mouse_location_in_world();
+        // 备选：使用鼠标在 z=0 平面上的投影
+        var fallback = this.editor.mouse.get_mouse_location_in_world();
+        console.log("MeasureTool: using fallback point", fallback);
+        return fallback;
     }
 
     _addMarker(p) {
         var world = this.editor.data.world;
-        var sceneP = world.lidarPosToScene(p);
 
         var geometry = new THREE.SphereGeometry(0.15, 16, 16);
         var material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         var sphere = new THREE.Mesh(geometry, material);
-        sphere.position.set(sceneP.x, sceneP.y, sceneP.z);
+        sphere.position.set(p.x, p.y, p.z);
 
         world.scene.add(sphere);
         this.markers.push(sphere);
@@ -126,8 +137,8 @@ class MeasureTool {
 
     _drawLine() {
         var world = this.editor.data.world;
-        var p1 = world.lidarPosToScene(this.points[0]);
-        var p2 = world.lidarPosToScene(this.points[1]);
+        var p1 = this.points[0];
+        var p2 = this.points[1];
 
         this.line = world.new_line(
             [p1.x, p1.y, p1.z],

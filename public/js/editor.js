@@ -1576,6 +1576,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
             // 测量模式下拾取点
             if (this.measureTool && this.measureTool.measuring) {
+                console.log("Editor: handleLeftClick in measure mode, onUpPosition=", this.mouse.onUpPosition);
                 this.measureTool.addPoint(this.mouse.onUpPosition);
                 return;
             }
