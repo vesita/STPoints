@@ -1,5 +1,6 @@
 
 import * as THREE from './lib/three.module.js';
+import { psr_to_xyz } from './util.js';
 
 class MeasureTool {
     constructor(editor) {
@@ -106,26 +107,89 @@ class MeasureTool {
 
         // screenPos 已经是 NDC 坐标 (-1 到 1)
         var mouse = new THREE.Vector2(screenPos.x, screenPos.y);
+        this.raycaster.setFromCamera(mouse, this.editor.viewManager.mainView.camera);
 
-        // 尝试从点云拾取
+        // 1. 尝试拾取 box 角点
+        var cornerPoint = this._pickBoxCorner(world);
+        if (cornerPoint) {
+            console.log("MeasureTool: picked box corner");
+            return cornerPoint;
+        }
+
+        // 2. 尝试从点云拾取
         if (world.lidar && world.lidar.points) {
-            this.raycaster.setFromCamera(mouse, this.editor.viewManager.mainView.camera);
-
-            // 使用较小的 threshold 提高精度
             this.raycaster.params.Points.threshold = 0.3;
             var intersects = this.raycaster.intersectObjects([world.lidar.points], false);
 
             if (intersects.length > 0) {
-                // 选择距离相机最近的点（第一个交点）
                 var p = intersects[0].point;
                 console.log("MeasureTool: picked from cloud, distance:", intersects[0].distance.toFixed(2));
                 return { x: p.x, y: p.y, z: p.z };
             }
         }
 
-        // 备选：使用鼠标在 z=0 平面上的投影
+        // 3. 备选：使用鼠标在 z=0 平面上的投影
         console.log("MeasureTool: using z=0 plane fallback");
         return this.editor.mouse.get_mouse_location_in_world();
+    }
+
+    _pickBoxCorner(world) {
+        if (!world.annotation || !world.annotation.boxes) return null;
+
+        var boxes = world.annotation.boxes;
+        var minDist = Infinity;
+        var closestCorner = null;
+        var threshold = 0.5; // 角点拾取阈值（米）
+
+        for (var i = 0; i < boxes.length; i++) {
+            var box = boxes[i];
+            var corners = psr_to_xyz(box.position, box.scale, box.rotation);
+
+            // 检查 8 个角点
+            for (var j = 0; j < 8; j++) {
+                var cx = corners[j * 4];
+                var cy = corners[j * 4 + 1];
+                var cz = corners[j * 4 + 2];
+
+                // 计算角点到射线的距离
+                var dist = this._pointToRayDistance(cx, cy, cz);
+                if (dist < threshold && dist < minDist) {
+                    minDist = dist;
+                    closestCorner = { x: cx, y: cy, z: cz };
+                }
+            }
+        }
+
+        return closestCorner;
+    }
+
+    _pointToRayDistance(px, py, pz) {
+        var ray = this.raycaster.ray;
+        var origin = ray.origin;
+        var direction = ray.direction;
+
+        // 计算点到射线的距离
+        var dx = px - origin.x;
+        var dy = py - origin.y;
+        var dz = pz - origin.z;
+
+        // 投影到射线方向
+        var dot = dx * direction.x + dy * direction.y + dz * direction.z;
+
+        // 如果在射线后方，返回大距离
+        if (dot < 0) return Infinity;
+
+        // 计算最近点
+        var closestX = origin.x + direction.x * dot;
+        var closestY = origin.y + direction.y * dot;
+        var closestZ = origin.z + direction.z * dot;
+
+        // 计算距离
+        var distX = px - closestX;
+        var distY = py - closestY;
+        var distZ = pz - closestZ;
+
+        return Math.sqrt(distX * distX + distY * distY + distZ * distZ);
     }
 
     _calcDistance() {
