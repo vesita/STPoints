@@ -543,16 +543,16 @@ function World(data, sceneName, frame, coordinatesOffset, on_preload_finished){
     this.new_line=function(start, end, color){
 
         var vertex = start.concat(end);
-        this.world.data.dbg.alloc();
+        this.data.dbg.alloc();
         var line = new THREE.BufferGeometry();
         line.addAttribute( 'position', new THREE.Float32BufferAttribute(vertex, 3 ) );
-        
+
         if (!color){
             color = 0x00ff00;
         }
-   
+
         var material = new THREE.LineBasicMaterial( { color: color, linewidth: 1, opacity: this.data.cfg.box_opacity, transparent: true } );
-        return new THREE.LineSegments( line, material );                
+        return new THREE.LineSegments( line, material );
     };
 
 
