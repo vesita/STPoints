@@ -340,7 +340,7 @@ class Root(object):
 
             res = solve_pnp_ippe(p3d, p2d, camera_matrix, dist_coeffs)
             err = res.get("reprojection_error", float("inf"))
-            results.append({"perm": list(perm), "error": err, "success": res.get("success", False)})
+            results.append({"perm": list(perm), "error": err, "success": res.get("success", False), "extrinsic": res.get("extrinsic")})
 
             if err < best["error"]:
                 best["error"] = err
