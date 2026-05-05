@@ -1108,8 +1108,8 @@
 						</div>
 						<div id="pnp-calib-body">
 							<div id="pnp-calib-image-area">
-								<svg id="pnp-calib-svg" viewBox="0 0 2048 1536" preserveAspectRatio="none">
-									<image id="pnp-calib-img" x="0" y="0" width="2048" height="1536" preserveAspectRatio="none" xlink:href="" />
+								<svg id="pnp-calib-svg" viewBox="0 0 2048 1536" preserveAspectRatio="xMidYMid meet">
+									<image id="pnp-calib-img" x="0" y="0" width="2048" height="1536" preserveAspectRatio="xMidYMid meet" xlink:href="" />
 									<g id="pnp-calib-handles"></g>
 								</svg>
 							</div>
@@ -1123,11 +1123,13 @@
 								<div class="pnp-buttons">
 									<button id="pnp-calib-solve" class="pnp-btn pnp-btn-primary" disabled>计算 PnP</button>
 								<button id="pnp-calib-manual-3d" class="pnp-btn" title="手动选择 3D 点">手动选点</button>
-									<button id="pnp-calib-cycle" class="pnp-btn" title="轮换 P0→P1→P2→P3">轮换点序</button>
 									<button id="pnp-calib-brute" class="pnp-btn" title="穷举 24 种点序组合">穷举测试</button>
 									<button id="pnp-calib-reset" class="pnp-btn">重置</button>
 									<button id="pnp-calib-save" class="pnp-btn pnp-btn-save" disabled>保存</button>
 								</div>
+t								<div class="pnp-option">
+										<label><input type="checkbox" id="pnp-only-box-corners" checked> 只捕捉 box 角点</label>
+									</div>
 								<div class="pnp-error">重投影误差: <span id="pnp-calib-error">--</span> px</div>
 								<div id="pnp-top4-results" style="display:none">
 									<div class="pnp-top4-header">穷举结果 (24种排列，按误差排序，点击预览):</div>
@@ -1353,8 +1355,8 @@
 		</template>
 		<template id="image-wrapper-template">
 			<div class="image-wrapper">
-				<svg id = "maincanvas-svg" viewbox="0 0 2048 1536" preserveAspectRatio="none">
-					<image id="svg-image" x="0" y="0"  width="2048" height="1536"  preserveAspectRatio="none"
+				<svg id = "maincanvas-svg" viewbox="0 0 2048 1536" preserveAspectRatio="xMidYMid meet">
+					<image id="svg-image" x="0" y="0"  width="2048" height="1536"  preserveAspectRatio="xMidYMid meet"
 					xlink:href=""
 					/>
 					<g id="svg-boxes"></g>

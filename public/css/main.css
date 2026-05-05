@@ -1440,3 +1440,22 @@ td {
 	pointer-events: none;
 	white-space: nowrap;
 }
+
+/* ── PnP Options ────────────────────────── */
+
+.pnp-option {
+	margin: 4px 0;
+	padding: 4px 0;
+}
+
+.pnp-option label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.pnp-option input[type="checkbox"] {
+	margin: 0;
+}

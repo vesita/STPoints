@@ -12,6 +12,7 @@ class MeasureTool {
         this.labelEl = null;
         this.raycaster = new THREE.Raycaster();
         this.onPick = null; // 回调函数，用于 PnP 等外部模块接收选择的点
+        this.onlyBoxCorners = false; // 是否只捕捉 box 角点
         // 初始化 Points threshold
         if (!this.raycaster.params.Points) {
             this.raycaster.params.Points = {};
@@ -29,6 +30,13 @@ class MeasureTool {
 
     stop() {
         this.measuring = false;
+
+        // 清除角点高亮
+        if (this._cornerHighlight) {
+            this.editor.scene.remove(this._cornerHighlight);
+            this._cornerHighlight = null;
+        }
+
         this._updateUI();
         this._showStatus("");
         console.log("MeasureTool: stopped");
@@ -106,6 +114,12 @@ class MeasureTool {
             this.line = null;
         }
 
+        // 清除角点高亮
+        if (this._cornerHighlight) {
+            this.editor.scene.remove(this._cornerHighlight);
+            this._cornerHighlight = null;
+        }
+
         this.points = [];
         this.editor.render();
     }
@@ -117,6 +131,17 @@ class MeasureTool {
         var mouse = new THREE.Vector2(screenPos.x, screenPos.y);
         this.raycaster.setFromCamera(mouse, this.editor.viewManager.mainView.camera);
 
+        // 如果设置了只捕捉 box 角点
+        if (this.onlyBoxCorners) {
+            var cornerPoint = this._pickBoxCorner(world);
+            if (cornerPoint) {
+                console.log("MeasureTool: picked box corner (onlyBoxCorners mode)");
+                return cornerPoint;
+            }
+            return null; // 没有找到角点则返回 null
+        }
+
+        // 正常模式：优先 box 角点，其次点云
         // 1. 尝试拾取 box 角点
         var cornerPoint = this._pickBoxCorner(world);
         if (cornerPoint) {
@@ -147,7 +172,7 @@ class MeasureTool {
         var boxes = world.annotation.boxes;
         var minDist = Infinity;
         var closestCorner = null;
-        var threshold = 0.5; // 角点拾取阈值（米）
+        var threshold = 2.0; // 增大角点拾取阈值（米）
 
         for (var i = 0; i < boxes.length; i++) {
             var box = boxes[i];
@@ -163,12 +188,36 @@ class MeasureTool {
                 var dist = this._pointToRayDistance(cx, cy, cz);
                 if (dist < threshold && dist < minDist) {
                     minDist = dist;
-                    closestCorner = { x: cx, y: cy, z: cz };
+                    closestCorner = { x: cx, y: cy, z: cz, boxIdx: i, cornerIdx: j };
                 }
             }
         }
 
+        // 高亮最近的角点
+        this._highlightCorner(closestCorner);
+
         return closestCorner;
+    }
+
+    _highlightCorner(corner) {
+        // 移除之前的高亮
+        if (this._cornerHighlight) {
+            this.editor.scene.remove(this._cornerHighlight);
+            this._cornerHighlight = null;
+        }
+
+        if (!corner) return;
+
+        // 创建小的高亮球体
+        var geometry = new THREE.SphereGeometry(0.08, 8, 8);
+        var material = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.8
+        });
+        this._cornerHighlight = new THREE.Mesh(geometry, material);
+        this._cornerHighlight.position.set(corner.x, corner.y, corner.z);
+        this.editor.scene.add(this._cornerHighlight);
     }
 
     _pointToRayDistance(px, py, pz) {

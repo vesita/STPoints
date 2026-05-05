@@ -68,18 +68,26 @@ function PnPCalib(data, editor) {
         this.errorEl = ctrl.querySelector("#pnp-calib-error");
         this.solveBtn = ctrl.querySelector("#pnp-calib-solve");
         this.manual3dBtn = ctrl.querySelector("#pnp-calib-manual-3d");
-        this.cycleBtn = ctrl.querySelector("#pnp-calib-cycle");
         this.bruteBtn = ctrl.querySelector("#pnp-calib-brute");
         this.resetBtn = ctrl.querySelector("#pnp-calib-reset");
         this.saveBtn = ctrl.querySelector("#pnp-calib-save");
+        this.onlyBoxCornersCheckbox = ctrl.querySelector("#pnp-only-box-corners");
 
         var pnp = this;
         this.solveBtn.onclick = function () { pnp.solve(); };
         this.manual3dBtn.onclick = function () { pnp.startManual3DSelection(); };
-        this.cycleBtn.onclick = function () { pnp.cycleOrder(); };
         this.bruteBtn.onclick = function () { pnp.bruteForce(); };
         this.resetBtn.onclick = function () { pnp.reset(); };
         this.saveBtn.onclick = function () { pnp.save(); };
+
+        // 只捕捉 box 角点复选框
+        if (this.onlyBoxCornersCheckbox) {
+            this.onlyBoxCornersCheckbox.onchange = function () {
+                if (pnp.editor.measureTool) {
+                    pnp.editor.measureTool.onlyBoxCorners = this.checked;
+                }
+            };
+        }
         view.querySelector("#pnp-calib-exit").onclick = function () { pnp.exit(); };
 
         // 点击背景关闭弹窗
@@ -639,72 +647,6 @@ function PnPCalib(data, editor) {
             this.errorEl.textContent =
                 "保存失败: " + (saveResult.error || "未知错误");
             console.error("PnPCalib: save failed", saveResult);
-        }
-    };
-
-    /** 轮换点序: 3D 点和 2D 点同时向前旋转一位 (P0→P1→P2→P3→P0) */
-    this.cycleOrder = function () {
-        if (!this.active) return;
-
-        // 旋转 3D 点
-        if (this.points_3d) {
-            var first3d = this.points_3d[0];
-            for (var i = 0; i < 3; i++) this.points_3d[i] = this.points_3d[i + 1];
-            this.points_3d[3] = first3d;
-        }
-
-        // 旋转 2D 角点
-        var first2d = this.corners[0];
-        for (var i = 0; i < 3; i++) this.corners[i] = this.corners[i + 1];
-        this.corners[3] = first2d;
-
-        // 旋转弹窗角点颜色标签（保持颜色与点序一致）
-        var colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
-        var labels = ["P0(左下)", "P1(右下)", "P2(右上)", "P3(左上)"];
-        var firstColor = colors[0];
-        var firstLabel = labels[0];
-        for (var i = 0; i < 3; i++) {
-            colors[i] = colors[i + 1];
-            labels[i] = labels[i + 1];
-        }
-        colors[3] = firstColor;
-        labels[3] = firstLabel;
-
-        // 更新 DOM 标签颜色和文字
-        var pnp = this;
-        for (var i = 0; i < 4; i++) {
-            var el = this.wrapper.querySelector(
-                `.pnp-corner[data-idx="${i}"] b`
-            );
-            if (el) {
-                el.style.color = colors[i];
-                el.textContent = labels[i];
-            }
-        }
-
-        // 清除旧结果
-        this.result = null;
-        if (this.errorEl) this.errorEl.textContent = "--";
-        if (this.saveBtn) this.saveBtn.disabled = true;
-
-        // 重新渲染
-        this._updateUI();
-        this._renderHandles();
-        this.editor.imageContextManager.renderPnpHandles(this.corners);
-
-        // 清除重投影标记
-        var reproj = this.svg ? this.svg.querySelector("#pnp-reprojected-group") : null;
-        if (reproj) reproj.remove();
-        var allBoxes = this.svg ? this.svg.querySelector("#pnp-all-boxes-group") : null;
-        if (allBoxes) allBoxes.remove();
-
-        console.log("PnPCalib: order cycled, new points_3d=", JSON.stringify(this.points_3d));
-
-        // 自动重新求解，动态更新所有重投影
-        var allPlaced = this.corners.every(function (c) { return c !== null; });
-        var allSet = this.points_3d.every(function (p) { return p !== null; });
-        if (allPlaced && allSet) {
-            this.solve();
         }
     };
 
