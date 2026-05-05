@@ -1396,3 +1396,18 @@ td {
 .pnp-top4-error {
 	color: #4caf50;
 }
+
+.pnp-top4-save-btn {
+	margin-left: auto;
+	padding: 1px 6px;
+	font-size: 11px;
+	background: var(--widget-background-color);
+	border: 1px solid var(--border-color, #555);
+	border-radius: 3px;
+	color: var(--widget-color);
+	cursor: pointer;
+}
+
+.pnp-top4-save-btn:hover {
+	background: var(--hover-background-color, #555);
+}

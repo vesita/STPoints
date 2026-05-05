@@ -723,15 +723,24 @@ function PnPCalib(data, editor) {
                 item.innerHTML =
                     '<span class="pnp-top4-rank">#' + (idx + 1) + '</span>' +
                     '<span class="pnp-top4-perm">[' + r.perm.join(",") + ']</span>' +
-                    '<span class="pnp-top4-error">' + r.error.toFixed(2) + ' px</span>';
+                    '<span class="pnp-top4-error">' + r.error.toFixed(2) + ' px</span>' +
+                    '<button class="pnp-top4-save-btn" title="保存此外参">保存</button>';
 
                 // 点击条目 → 实时预览（更新所有重投影）
-                item.addEventListener("click", function () {
+                item.addEventListener("click", function (e) {
+                    if (e.target.classList.contains("pnp-top4-save-btn")) return;
                     list.querySelectorAll(".pnp-top4-item").forEach(function (el) {
                         el.classList.remove("selected");
                     });
                     item.classList.add("selected");
                     pnp._previewBruteResult(results[idx], scene, camName);
+                });
+
+                // 保存按钮 → 直接保存此外参到文件
+                var saveBtn = item.querySelector(".pnp-top4-save-btn");
+                saveBtn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    pnp._saveBruteResult(results[idx], scene, camName);
                 });
 
                 list.appendChild(item);
@@ -770,6 +779,38 @@ function PnPCalib(data, editor) {
         var selBox = this.editor.selected_box;
         if (selBox && selBox.boxEditor) {
             selBox.boxEditor.focusImageContext.updateFocusedImageContext(selBox);
+        }
+    };
+
+    /** 保存穷举结果中的某个外参到文件 */
+    this._saveBruteResult = async function (result, scene, camName) {
+        if (!result || !result.extrinsic) {
+            this.errorEl.textContent = "保存失败: 无有效外参";
+            return;
+        }
+
+        try {
+            var response = await fetch("/calib_save", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    scene: scene,
+                    camera: camName,
+                    extrinsic: result.extrinsic,
+                }),
+            });
+            var saveResult = await response.json();
+        } catch (e) {
+            this.errorEl.textContent = "保存失败: 网络错误";
+            console.error("PnPCalib: save network error", e);
+            return;
+        }
+
+        if (saveResult.success) {
+            this.errorEl.textContent = "已保存外参 (perm=[" + result.perm.join(",") + "], err=" + result.error.toFixed(2) + "px)";
+            console.log("PnPCalib: brute result saved", result.perm);
+        } else {
+            this.errorEl.textContent = "保存失败: " + (saveResult.error || "未知错误");
         }
     };
 
