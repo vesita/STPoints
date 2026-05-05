@@ -1108,10 +1108,12 @@
 						</div>
 						<div id="pnp-calib-body">
 							<div id="pnp-calib-image-area">
-								<svg id="pnp-calib-svg" viewBox="0 0 2048 1536" preserveAspectRatio="xMidYMid meet">
-									<image id="pnp-calib-img" x="0" y="0" width="2048" height="1536" preserveAspectRatio="xMidYMid meet" xlink:href="" />
+								<div class="pnp-spacer"></div>
+								<svg id="pnp-calib-svg" preserveAspectRatio="xMidYMid meet">
+									<image id="pnp-calib-img" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" xlink:href="" />
 									<g id="pnp-calib-handles"></g>
 								</svg>
+								<div class="pnp-spacer"></div>
 							</div>
 							<div id="pnp-calib-controls">
 								<div class="pnp-corners">
@@ -1127,7 +1129,7 @@
 									<button id="pnp-calib-reset" class="pnp-btn">重置</button>
 									<button id="pnp-calib-save" class="pnp-btn pnp-btn-save" disabled>保存</button>
 								</div>
-t								<div class="pnp-option">
+								<div class="pnp-option">
 										<label><input type="checkbox" id="pnp-only-box-corners" checked> 只捕捉 box 角点</label>
 									</div>
 								<div class="pnp-error">重投影误差: <span id="pnp-calib-error">--</span> px</div>

@@ -136,61 +136,14 @@ function PnPCalib(data, editor) {
 
     // ── SVG 坐标转换 ──────────────────────────────────────────────────────
 
-    /** 将鼠标事件 clientX/Y 转为 SVG viewBox 坐标 */
-    this._svgCoords = function (event) {
-        var rect = this.svg.getBoundingClientRect();
-        var vb = this.svg.getAttribute("viewBox").split(" ").map(Number);
-        return {
-            u: (event.clientX - rect.left) * (vb[2] / rect.width),
-            v: (event.clientY - rect.top)  * (vb[3] / rect.height),
-        };
-    };
-
-    /** 获取图片在 SVG 中的实际显示区域 */
-    this._getImageBounds = function () {
-        var svgRect = this.svg.getBoundingClientRect();
-        var imgWidth = this.imageEl.naturalWidth || 2048;
-        var imgHeight = this.imageEl.naturalHeight || 1536;
-
-        // 计算保持宽高比后的实际显示尺寸
-        var svgWidth = svgRect.width;
-        var svgHeight = svgRect.height;
-        var scale = Math.min(svgWidth / imgWidth, svgHeight / imgHeight);
-
-        var displayWidth = imgWidth * scale;
-        var displayHeight = imgHeight * scale;
-
-        // 图片在 SVG 中居中显示
-        var offsetX = (svgWidth - displayWidth) / 2;
-        var offsetY = (svgHeight - displayHeight) / 2;
-
-        return {
-            x: offsetX,
-            y: offsetY,
-            width: displayWidth,
-            height: displayHeight,
-            scale: scale
-        };
-    };
-
-    /** 检查点击是否在图片区域内，并返回图片坐标 */
+    /** 将鼠标事件转为图片像素坐标，null 表示在图片外 */
     this._getImageCoords = function (event) {
         var rect = this.svg.getBoundingClientRect();
-        var mouseX = event.clientX - rect.left;
-        var mouseY = event.clientY - rect.top;
-
-        var bounds = this._getImageBounds();
-
-        // 检查是否在图片区域内
-        if (mouseX < bounds.x || mouseX > bounds.x + bounds.width ||
-            mouseY < bounds.y || mouseY > bounds.y + bounds.height) {
-            return null; // 点击在图片外部
-        }
-
-        // 转换为图片坐标
-        var u = (mouseX - bounds.x) / bounds.scale;
-        var v = (mouseY - bounds.y) / bounds.scale;
-
+        var vb = this.svg.viewBox.baseVal;
+        if (!vb || vb.width === 0 || vb.height === 0) return null;
+        var u = (event.clientX - rect.left) / rect.width * vb.width;
+        var v = (event.clientY - rect.top) / rect.height * vb.height;
+        if (u < 0 || u > vb.width || v < 0 || v > vb.height) return null;
         return { u: u, v: v };
     };
 
@@ -229,33 +182,15 @@ function PnPCalib(data, editor) {
 
     // ── 弹窗 SVG 角点渲染 ─────────────────────────────────────────────────
 
-    /** 将图片坐标转换为 SVG viewBox 坐标 */
-    this._imageToSvgCoords = function (u, v) {
-        var bounds = this._getImageBounds();
-        // 图片坐标 -> SVG 坐标
-        return {
-            x: bounds.x / (this.svg.getBoundingClientRect().width / 2048) + u * bounds.scale / (this.svg.getBoundingClientRect().width / 2048),
-            y: bounds.y / (this.svg.getBoundingClientRect().height / 1536) + v * bounds.scale / (this.svg.getBoundingClientRect().height / 1536)
-        };
-    };
-
     /** 在弹窗 SVG 上绘制 4 个拖拽手柄 */
     this._renderHandles = function () {
         while (this.handleGroup.firstChild) {
             this.handleGroup.firstChild.remove();
         }
-        var bounds = this._getImageBounds();
-        var svgRect = this.svg.getBoundingClientRect();
-        var scaleX = 2048 / svgRect.width;
-        var scaleY = 1536 / svgRect.height;
 
         for (var i = 0; i < 4; i++) {
             var c = this.corners[i];
             if (!c) continue;
-
-            // 图片坐标 -> SVG viewBox 坐标
-            var u = (bounds.x + c.u * bounds.scale) * scaleX;
-            var v = (bounds.y + c.v * bounds.scale) * scaleY;
 
             var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
             g.setAttribute("class", "pnp-handle");
@@ -263,8 +198,8 @@ function PnPCalib(data, editor) {
             this.handleGroup.appendChild(g);
 
             var circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-            circle.setAttribute("cx", u);
-            circle.setAttribute("cy", v);
+            circle.setAttribute("cx", c.u);
+            circle.setAttribute("cy", c.v);
             circle.setAttribute("r", 10);
             circle.setAttribute("class", "pnp-handle-circle");
             circle.setAttribute("data-idx", i);
@@ -277,28 +212,22 @@ function PnPCalib(data, editor) {
             g.appendChild(circle);
 
             var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            text.setAttribute("x", u + 14);
-            text.setAttribute("y", v - 14);
+            text.setAttribute("x", c.u + 14);
+            text.setAttribute("y", c.v - 14);
             text.setAttribute("class", "pnp-handle-label");
             text.appendChild(document.createTextNode("P" + i));
             g.appendChild(text);
         }
     };
 
-    /** 更新弹窗 SVG 上指定手柄的位置（按 data-idx 查找），u/v 为实际图像像素 */
+    /** 更新弹窗 SVG 上指定手柄的位置（按 data-idx 查找），u/v 为图片像素坐标 */
     this._updateHandle = function (idx, u, v) {
         var g = this.handleGroup.querySelector('[data-idx="' + idx + '"]');
         if (!g) return;
-        var bounds = this._getImageBounds();
-        var svgRect = this.svg.getBoundingClientRect();
-        var scaleX = 2048 / svgRect.width;
-        var scaleY = 1536 / svgRect.height;
-        var su = (bounds.x + u * bounds.scale) * scaleX;
-        var sv = (bounds.y + v * bounds.scale) * scaleY;
-        g.querySelector("circle").setAttribute("cx", su);
-        g.querySelector("circle").setAttribute("cy", sv);
-        g.querySelector("text").setAttribute("x", su + 14);
-        g.querySelector("text").setAttribute("y", sv - 14);
+        g.querySelector("circle").setAttribute("cx", u);
+        g.querySelector("circle").setAttribute("cy", v);
+        g.querySelector("text").setAttribute("x", u + 14);
+        g.querySelector("text").setAttribute("y", v - 14);
     };
 
     /** 在弹窗 SVG 上绘制重投影点（十字标记），用于对比用户拖拽位置 */
@@ -320,19 +249,14 @@ function PnPCalib(data, editor) {
         var proj = points3d_homo_to_image2d(homo, calib);
         if (!proj) return;
 
-        var bounds = this._getImageBounds();
-        var svgRect = this.svg.getBoundingClientRect();
-        var scaleX = 2048 / svgRect.width;
-        var scaleY = 1536 / svgRect.height;
-
         var g = document.createElementNS("http://www.w3.org/2000/svg", "g");
         g.setAttribute("id", "pnp-reprojected-group");
         var colors = ["#ff4444", "#44ff44", "#4444ff", "#ffff44"];
 
         for (var i = 0; i < 4; i++) {
-            // proj 是图片坐标，转换为 SVG viewBox 坐标
-            var u = (bounds.x + proj[i * 2] * bounds.scale) * scaleX;
-            var v = (bounds.y + proj[i * 2 + 1] * bounds.scale) * scaleY;
+            // proj 是图片像素坐标，viewBox = 图片尺寸，直接使用
+            var u = proj[i * 2];
+            var v = proj[i * 2 + 1];
             // 十字标记
             var line1 = document.createElementNS("http://www.w3.org/2000/svg", "line");
             line1.setAttribute("x1", u - 8); line1.setAttribute("y1", v);
@@ -345,7 +269,7 @@ function PnPCalib(data, editor) {
             line2.setAttribute("stroke", colors[i]); line2.setAttribute("stroke-width", "2");
             g.appendChild(line2);
 
-            console.log("PnPCalib: reprojected P" + i + " img=(" + (u/ratio.x).toFixed(1) + ", " + (v/ratio.y).toFixed(1) +
+            console.log("PnPCalib: reprojected P" + i + " img=(" + u.toFixed(1) + ", " + v.toFixed(1) +
                 ") vs dragged = (" + this.corners[i].u.toFixed(1) + ", " + this.corners[i].v.toFixed(1) + ")");
         }
         this.svg.appendChild(g);
@@ -384,7 +308,22 @@ function PnPCalib(data, editor) {
             if (!camName) return;
             var img = this.data.world.cameras.getImageByName(camName);
             if (img) {
+                var pnp = this;
+                // 设置 SVG viewBox 匹配图片自然尺寸
+                var w = img.naturalWidth || 2048;
+                var h = img.naturalHeight || 1536;
+                this.svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+                this.imageEl.setAttribute("width", w);
+                this.imageEl.setAttribute("height", h);
                 this.imageEl.setAttribute("xlink:href", img.src);
+                // 图片可能已缓存加载完成，手动触发尺寸更新
+                if (img.complete) {
+                    var nw = img.naturalWidth || 2048;
+                    var nh = img.naturalHeight || 1536;
+                    pnp.svg.setAttribute("viewBox", "0 0 " + nw + " " + nh);
+                    pnp.imageEl.setAttribute("width", nw);
+                    pnp.imageEl.setAttribute("height", nh);
+                }
             }
         } catch (e) {
             console.warn("PnPCalib: failed to load image", e);
@@ -921,20 +860,10 @@ function PnPCalib(data, editor) {
             var opacity = isSelected ? "0.9" : "0.4";
             var strokeWidth = isSelected ? "2" : "1";
 
-            // 将图片坐标转换为 SVG 坐标的辅助函数
-            function toSvg(u, v, self) {
-                return self._imageToSvgCoords(u, v);
-            }
-
             // 画前面 (+X 面): indices 0-3 → pts[0..7]
             var frontPts = pts.slice(0, 8);
-            var frontSvg = [];
-            for (var k = 0; k < 4; k++) {
-                var sv = toSvg(frontPts[k * 2], frontPts[k * 2 + 1], this);
-                frontSvg.push(sv.x, sv.y);
-            }
             var polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            polygon.setAttribute("points", frontSvg.join(","));
+            polygon.setAttribute("points", frontPts.join(","));
             polygon.setAttribute("fill", color);
             polygon.setAttribute("fill-opacity", opacity);
             polygon.setAttribute("stroke", color);
@@ -943,13 +872,8 @@ function PnPCalib(data, editor) {
 
             // 画后面 (-X 面): indices 4-7 → pts[8..15]
             var rearPts = pts.slice(8, 16);
-            var rearSvg = [];
-            for (var k = 0; k < 4; k++) {
-                var sv = toSvg(rearPts[k * 2], rearPts[k * 2 + 1], this);
-                rearSvg.push(sv.x, sv.y);
-            }
             var polygon2 = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            polygon2.setAttribute("points", rearSvg.join(","));
+            polygon2.setAttribute("points", rearPts.join(","));
             polygon2.setAttribute("fill", "none");
             polygon2.setAttribute("stroke", color);
             polygon2.setAttribute("stroke-width", strokeWidth);
@@ -958,11 +882,9 @@ function PnPCalib(data, editor) {
 
             // 连接前后面对应边
             for (var j = 0; j < 4; j++) {
-                var sv1 = toSvg(pts[j * 2], pts[j * 2 + 1], this);
-                var sv2 = toSvg(pts[(j + 4) * 2], pts[(j + 4) * 2 + 1], this);
                 var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                line.setAttribute("x1", sv1.x); line.setAttribute("y1", sv1.y);
-                line.setAttribute("x2", sv2.x); line.setAttribute("y2", sv2.y);
+                line.setAttribute("x1", pts[j * 2]); line.setAttribute("y1", pts[j * 2 + 1]);
+                line.setAttribute("x2", pts[(j + 4) * 2]); line.setAttribute("y2", pts[(j + 4) * 2 + 1]);
                 line.setAttribute("stroke", color);
                 line.setAttribute("stroke-width", "1");
                 line.setAttribute("stroke-opacity", opacity);
@@ -971,10 +893,8 @@ function PnPCalib(data, editor) {
 
             // 标注 track id
             if (box.obj_track_id) {
-                var svFront = toSvg(pts[0], pts[1], this);
-                var svRear = toSvg(pts[8], pts[9], this);
-                var cx = (svFront.x + svRear.x) / 2;
-                var cy = (svFront.y + svRear.y) / 2;
+                var cx = (pts[0] + pts[8]) / 2;
+                var cy = (pts[1] + pts[9]) / 2;
                 var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
                 label.setAttribute("x", cx);
                 label.setAttribute("y", cy - 6);
@@ -1046,18 +966,6 @@ function PnPCalib(data, editor) {
         } catch (e) {
             return null;
         }
-    };
-
-    /** 获取弹窗图像实际像素 → SVG viewBox 的缩放比 */
-    this._getImageSvgRatio = function () {
-        var img = this.imageEl;
-        if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
-            return {
-                x: 2048 / img.naturalWidth,
-                y: 1536 / img.naturalHeight
-            };
-        }
-        return { x: 1, y: 1 };
     };
 
     this._updateUI = function () {
@@ -1175,11 +1083,13 @@ function PnPCalib(data, editor) {
             var proj = points3d_homo_to_image2d(homo, calib);
             console.log("PnPCalib: P" + pIdx + " proj=", proj, "calib.extrinsic=", calib.extrinsic ? "ok" : "MISSING");
             if (proj && isFinite(proj[0]) && isFinite(proj[1])) {
-                // proj 是实际图像像素坐标，转换为 SVG 坐标
-                var svgCoord = this._imageToSvgCoords(proj[0], proj[1]);
+                // proj 是图片像素坐标，viewBox = 图片尺寸，直接使用
+                var vb = this.svg.viewBox.baseVal;
+                var maxU = vb.width > 0 ? vb.width - 20 : 2028;
+                var maxV = vb.height > 0 ? vb.height - 20 : 1516;
                 this.corners[pIdx] = {
-                    u: Math.max(20, Math.min(2028, svgCoord.x)),
-                    v: Math.max(20, Math.min(1516, svgCoord.y))
+                    u: Math.max(20, Math.min(maxU, proj[0])),
+                    v: Math.max(20, Math.min(maxV, proj[1]))
                 };
                 placed = true;
             }
