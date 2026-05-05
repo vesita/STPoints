@@ -209,7 +209,7 @@ class MeasureTool {
         if (!corner) return;
 
         // 创建小的高亮球体
-        var geometry = new THREE.SphereGeometry(0.08, 8, 8);
+        var geometry = new THREE.SphereGeometry(0.03, 8, 8);
         var material = new THREE.MeshBasicMaterial({
             color: 0x00ff00,
             transparent: true,
