@@ -42,7 +42,7 @@ function PnPCalib(data, editor) {
     this._cornerMarkerGroup = null;
     this._cornerClickHandler = null;
     this._selectedCornerIndices = []; // 用户选中的 8 角点中的索引
-    this._allCorners3d = null;        // box 的 8 个角点 3D 坐标
+    this._allMarkers3d = null;        // 12 个标记：4 边中点 + 4 前角 + 4 后角
 
     this.init = function () {
         // DOM 元素由 _queryDom 延迟查询
@@ -117,11 +117,12 @@ function PnPCalib(data, editor) {
             if (pIdx < 0) return;
             // 设置2D角点位置
             pnp.corners[pIdx] = { u: u, v: v };
-            // 自动从box正面4个角点获取3D坐标
-            if (pnp._allCorners3d && pIdx < 4) {
-                pnp.points_3d[pIdx] = pnp._allCorners3d[pIdx];
+            // 自动从box边中点获取3D坐标（x=0 平面）
+            if (pnp._allMarkers3d && pIdx < 4) {
+                pnp.points_3d[pIdx] = pnp._allMarkers3d[pIdx];
+                var pt = pnp._allMarkers3d[pIdx];
                 console.log("PnPCalib: placed P" + pIdx + " at (" + u.toFixed(1) + ", " + v.toFixed(1) + ")" +
-                    " 3D=(" + pnp._allCorners3d[pIdx][0].toFixed(3) + "," + pnp._allCorners3d[pIdx][1].toFixed(3) + "," + pnp._allCorners3d[pIdx][2].toFixed(3) + ")");
+                    " 3D=(" + pt[0].toFixed(3) + "," + pt[1].toFixed(3) + "," + pt[2].toFixed(3) + ")");
             } else {
                 console.log("PnPCalib: placed P" + pIdx + " at (" + u.toFixed(1) + ", " + v.toFixed(1) + ") [no 3D data]");
             }
@@ -987,42 +988,81 @@ function PnPCalib(data, editor) {
 
     // ── 3D 角点选择 ──────────────────────────────────────────────────────────
 
-    /** 在 3D 场景中创建 8 个角点球体标记，用户点击选择 P0-P3 */
+    /** 在 3D 场景中创建标记：4 个边中点（默认）+ 8 个角点，用户点击选择 P0-P3 */
     this._create3DCornerMarkers = function (box) {
         this._remove3DCornerMarkers();
         this._selectedCornerIndices = [];
 
         var box3d = psr_to_xyz(box.position, box.scale, box.rotation);
         // 8 个角点的 3D 坐标
-        this._allCorners3d = [];
+        var corners = [];
         for (var i = 0; i < 8; i++) {
-            this._allCorners3d.push([
-                box3d[i * 4], box3d[i * 4 + 1], box3d[i * 4 + 2]
+            corners.push([box3d[i * 4], box3d[i * 4 + 1], box3d[i * 4 + 2]]);
+        }
+
+        // 4 个边中点 = (前面[i] + 后面[i]) / 2，都在 x=0 平面上
+        var midpoints = [];
+        for (var i = 0; i < 4; i++) {
+            midpoints.push([
+                (corners[i][0] + corners[i + 4][0]) / 2,
+                (corners[i][1] + corners[i + 4][1]) / 2,
+                (corners[i][2] + corners[i + 4][2]) / 2
             ]);
         }
+
+        // 统一存储：idx 0-3 边中点，4-7 前角点，8-11 后角点
+        this._allMarkers3d = midpoints.concat(corners);
 
         // 球体半径：取 box 最大维度的 5%，至少 0.1
         var maxScale = Math.max(box.scale.x, box.scale.y, box.scale.z);
         var sphereRadius = Math.max(maxScale * 0.05, 0.1);
+        var midRadius = sphereRadius * 0.75;
 
         var group = new THREE.Group();
         group.name = "pnp-corner-markers";
-        var colors = [
-            0xff4444, 0x44ff44, 0x4444ff, 0xffff44,
-            0xff8888, 0x88ff88, 0x8888ff, 0xffff88
-        ];
 
-        for (var i = 0; i < 8; i++) {
-            var geo = new THREE.SphereGeometry(sphereRadius);
+        // 颜色：中点(青/洋红/橙/紫), 前角(红/绿/蓝/黄), 后角(浅色)
+        var midColors = [0x00cccc, 0xcc00cc, 0xcc8800, 0x8800cc];
+        var frontColors = [0xff4444, 0x44ff44, 0x4444ff, 0xffff44];
+        var backColors = [0xff8888, 0x88ff88, 0x8888ff, 0xffff88];
+        var allColors = midColors.concat(frontColors).concat(backColors);
+        var labels = ["M0", "M1", "M2", "M3", "C0", "C1", "C2", "C3", "C4", "C5", "C6", "C7"];
+
+        // 保存 mesh 引用，方便选中时更新样式
+        this._markerMeshes = [];
+
+        for (var i = 0; i < 12; i++) {
+            var isMid = i < 4;
+            var geo = isMid
+                ? new THREE.OctahedronGeometry(midRadius)
+                : new THREE.SphereGeometry(sphereRadius);
             var mat = new THREE.MeshBasicMaterial({
-                color: colors[i],
+                color: allColors[i],
                 depthTest: false
             });
             var mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(this._allCorners3d[i][0], this._allCorners3d[i][1], this._allCorners3d[i][2]);
+            var pt = this._allMarkers3d[i];
+            mesh.position.set(pt[0], pt[1], pt[2]);
             mesh.userData.pnpCornerIdx = i;
             mesh.renderOrder = 999;
             group.add(mesh);
+            this._markerMeshes.push(mesh);
+
+            // 标签
+            var canvas = document.createElement("canvas");
+            canvas.width = 64; canvas.height = 32;
+            var ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#" + allColors[i].toString(16).padStart(6, "0");
+            ctx.font = "bold 22px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(labels[i], 32, 24);
+            var tex = new THREE.CanvasTexture(canvas);
+            var spriteMat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+            var sprite = new THREE.Sprite(spriteMat);
+            sprite.position.set(pt[0], pt[1] + sphereRadius * 1.5, pt[2]);
+            sprite.scale.set(sphereRadius * 2, sphereRadius, 1);
+            sprite.renderOrder = 998;
+            group.add(sprite);
         }
 
         this.editor.scene.add(group);
@@ -1041,7 +1081,9 @@ function PnPCalib(data, editor) {
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-            var intersects = raycaster.intersectObjects(group.children);
+            // 只检测 Mesh（跳过 Sprite 标签）
+            var meshes = group.children.filter(function (c) { return c.isMesh; });
+            var intersects = raycaster.intersectObjects(meshes);
             if (intersects.length > 0) {
                 var idx = intersects[0].object.userData.pnpCornerIdx;
                 pnp._selectCorner(idx);
@@ -1050,15 +1092,15 @@ function PnPCalib(data, editor) {
         };
         renderer.domElement.addEventListener("pointerdown", this._cornerClickHandler);
 
-        console.log("PnPCalib: 3D corner markers created (r=" + sphereRadius.toFixed(3) + "), click to select P0-P3");
-        console.log("  8 corners:", JSON.stringify(this._allCorners3d));
+        console.log("PnPCalib: markers created — 4 midpoints + 8 corners");
+        console.log("  midpoints (x≈0):", JSON.stringify(midpoints));
     };
 
-    /** 用户点击了一个 3D 角点，分配为下一个 P 点 */
+    /** 用户点击了一个 3D 标记，分配为下一个 P 点 */
     this._selectCorner = function (cornerIdx) {
         // 检查是否已选过
         if (this._selectedCornerIndices.indexOf(cornerIdx) >= 0) {
-            console.log("PnPCalib: corner " + cornerIdx + " already selected");
+            console.log("PnPCalib: marker " + cornerIdx + " already selected");
             return;
         }
 
@@ -1066,12 +1108,12 @@ function PnPCalib(data, editor) {
         if (pIdx >= 4) return;
 
         this._selectedCornerIndices.push(cornerIdx);
-        var pt = this._allCorners3d[cornerIdx];
+        var pt = this._allMarkers3d[cornerIdx];
         this.points_3d[pIdx] = pt;
 
-        // 更新球体颜色为对应 P 点颜色
+        // 更新标记颜色为对应 P 点颜色
         var pColors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00];
-        var marker = this._cornerMarkerGroup.children[cornerIdx];
+        var marker = this._markerMeshes[cornerIdx];
         if (marker) {
             marker.material.color.setHex(pColors[pIdx]);
             marker.scale.multiplyScalar(1.3); // 选中的稍大一些
@@ -1142,8 +1184,9 @@ function PnPCalib(data, editor) {
             });
             this._cornerMarkerGroup = null;
         }
+        this._markerMeshes = [];
         this._selectedCornerIndices = [];
-        this._allCorners3d = null;
+        this._allMarkers3d = null;
     };
 
     // ── Z-view 角点标签 ──────────────────────────────────────────────────────
