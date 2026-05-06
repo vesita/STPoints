@@ -1629,3 +1629,9 @@ td {
 }
 
 #intrinsic-calib-button { cursor: pointer; }
+#intrinsic-calib-button.active {
+	background: var(--highlight-background-color, #555);
+}
+#intrinsic-calib-button.active svg {
+	color: var(--highlight-color, #8f8);
+}

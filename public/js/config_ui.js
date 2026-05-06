@@ -50,6 +50,12 @@ class ConfigUi{
         "#cfg-start-pnp":(event)=>{
             var box = this.editor.selected_box;
             if (box) {
+                // 关闭其他面板
+                if (this.editor.intrinsicCalib && this.editor.intrinsicCalib.active) {
+                    this.editor.intrinsicCalib.exit();
+                    var ib = document.querySelector("#intrinsic-calib-button");
+                    if (ib) ib.classList.remove("active");
+                }
                 this.editor.pnpCalib.enter(box);
             } else {
                 alert("请先在 3D 场景中选择一个物体框");

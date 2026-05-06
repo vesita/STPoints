@@ -43,6 +43,7 @@ function IntrinsicCalib(data, editor) {
             console.error("IntrinsicCalib: panel not found");
             return;
         }
+        if (this.active) this.exit(); // 防止重复绑定
         this.active = true;
         this.cameraName = cameraName || this._getActiveCameraName();
         this.images = [];
@@ -198,8 +199,10 @@ function IntrinsicCalib(data, editor) {
         }).then(function (resp) {
             return resp.json();
         }).then(function (data) {
+            if (!self.active) return;
             self._onDetectResult(data);
         }).catch(function (err) {
+            if (!self.active) return;
             self._updateStatus("检测失败: " + err.message);
             self.detectBtn.disabled = false;
         });
@@ -236,13 +239,18 @@ function IntrinsicCalib(data, editor) {
             clearBtn.textContent = "清除失败图片";
             clearBtn.style.cssText = "margin-left:8px;padding:2px 8px;font-size:12px;";
             clearBtn.addEventListener("click", function () {
-                self.images = self.images.filter(function (x) { return x.success; });
+                var before = self.images.length;
+                self.images = self.images.filter(function (x) { return x.success !== false; });
+                var removed = before - self.images.length;
                 self._renderImageList();
-                var okCount = self.images.length;
+                var okCount = self.images.filter(function (x) { return x.success; }).length;
                 self.calcBtn.disabled = okCount < 3;
+                if (self.images.length === 0) {
+                    self.detectBtn.disabled = true;
+                }
                 self.statusEl.innerHTML = "";
                 var s = document.createElement("span");
-                s.textContent = "已清除失败图片，剩余 " + okCount + " 张。";
+                s.textContent = "已清除 " + removed + " 张失败图片，剩余 " + self.images.length + " 张（" + okCount + " 张检测成功）。";
                 self.statusEl.appendChild(s);
             });
             this.statusEl.appendChild(clearBtn);
@@ -291,7 +299,8 @@ function IntrinsicCalib(data, editor) {
                 self.calcBtn.disabled = okCount < 3;
                 if (self.images.length === 0) {
                     self.detectBtn.disabled = true;
-                    self._updateStatus("所有图片已删除");
+                    document.getElementById("intrinsic-file-input").value = "";
+                    self._updateStatus("所有图片已删除，可重新选择图片");
                 }
             });
             card.appendChild(removeBtn);
@@ -363,9 +372,11 @@ function IntrinsicCalib(data, editor) {
             }
             return resp.json();
         }).then(function (data) {
+            if (!self.active) return;
             console.log("[IntrinsicCalib] 计算结果:", data);
             self._onCalibrateResult(data);
         }).catch(function (err) {
+            if (!self.active) return;
             console.error("[IntrinsicCalib] 计算失败:", err);
             self._updateStatus("计算失败: " + err.message);
             self.calcBtn.disabled = false;
@@ -440,6 +451,7 @@ function IntrinsicCalib(data, editor) {
         }).then(function (resp) {
             return resp.json();
         }).then(function (data) {
+            if (!self.active) return;
             if (data.success) {
                 self._updateStatus("已保存到标定文件: " + scene + "/calib/camera/" + self.cameraName + ".json");
             } else {
@@ -447,6 +459,7 @@ function IntrinsicCalib(data, editor) {
                 self.saveBtn.disabled = false;
             }
         }).catch(function (err) {
+            if (!self.active) return;
             self._updateStatus("保存失败: " + err.message);
             self.saveBtn.disabled = false;
         });

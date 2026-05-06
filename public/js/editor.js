@@ -92,6 +92,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         var measureBtn = editorUi.querySelector("#measure-button");
         if (measureBtn) {
             measureBtn.addEventListener("click", function() {
+                // 如果 PnP 正在手动选 3D 点，不要打断
+                if (self.pnpCalib && self.pnpCalib.active) return;
                 self.measureTool.toggle();
             });
         }
@@ -110,7 +112,16 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         var intrinsicBtn = editorUi.querySelector("#intrinsic-calib-button");
         if (intrinsicBtn) {
             intrinsicBtn.addEventListener("click", function() {
-                self.intrinsicCalib.enter();
+                if (!self.data || !self.data.world) return;
+                if (self.intrinsicCalib.active) {
+                    self.intrinsicCalib.exit();
+                    intrinsicBtn.classList.remove("active");
+                } else {
+                    // 关闭其他面板
+                    if (self.pnpCalib && self.pnpCalib.active) self.pnpCalib.exit();
+                    self.intrinsicCalib.enter();
+                    intrinsicBtn.classList.add("active");
+                }
             });
         }
 
@@ -162,7 +173,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         var editor = this;
         this.imageContextManager._onUndistortToggle = function() {
             // 刷新 box editor 缩略图
-            if (editor.boxEditor && editor.boxEditor.box) {
+            if (editor.boxEditor && editor.boxEditor.box && editor.boxEditor.focusImageContext) {
                 editor.boxEditor.focusImageContext.updateFocusedImageContext(editor.boxEditor.box);
             }
         };
@@ -2085,6 +2096,14 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
             case 'Escape':
                 if (this.measureTool && this.measureTool.measuring) {
                     this.measureTool.stop();
+                } else if (this.pnpCalib && this.pnpCalib.active) {
+                    this.pnpCalib.exit();
+                } else if (this.intrinsicCalib && this.intrinsicCalib.active) {
+                    this.intrinsicCalib.exit();
+                    var ib = editorUi.querySelector("#intrinsic-calib-button");
+                    if (ib) ib.classList.remove("active");
+                } else if (this.selected_box) {
+                    this.unselectBox(null);
                 }
                 break;
             case '+':
@@ -2240,11 +2259,6 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
             case 'Delete':
                 this.remove_selected_box();
                 this.header.updateModifiedStatus();
-                break;
-            case 'Escape':
-                if (this.selected_box){
-                    this.unselectBox(null);
-                }
                 break;
         }
     };

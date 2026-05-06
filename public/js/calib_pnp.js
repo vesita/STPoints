@@ -350,6 +350,19 @@ function PnPCalib(data, editor) {
         this.points_3d = [null, null, null, null];
         this.result = null;
         this._draggingIdx = -1;
+        this._savedExtrinsic = null;
+        this._bruteForceResults = null;
+        this._originalCorners2d = null;
+        this._manualPickIndex = 0;
+
+        // 重置按钮状态
+        if (this.saveBtn) this.saveBtn.disabled = true;
+        if (this.bruteBtn) this.bruteBtn.disabled = false;
+        if (this.manual3dBtn) {
+            this.manual3dBtn.disabled = false;
+            this.manual3dBtn.textContent = "手动选3D点";
+        }
+        if (this.errorEl) this.errorEl.textContent = "--";
 
         // 3D 角点选择模式：在 box 的 8 个角上放球体标记，
         // 用户在 3D 视图中依次点击 4 个角作为 P0-P3，
@@ -445,7 +458,7 @@ function PnPCalib(data, editor) {
     this.exit = function () {
         this.active = false;
         this.corners = [null, null, null, null];
-        this.points_3d = null;
+        this.points_3d = [null, null, null, null];
         this.result = null;
         this._draggingIdx = -1;
         this._manualPickIndex = 0;
@@ -581,6 +594,7 @@ function PnPCalib(data, editor) {
             this.result = await response.json();
         } catch (e) {
             this.errorEl.textContent = "网络错误";
+            this.saveBtn.disabled = true;
             console.error("PnPCalib: network error", e);
             return;
         }
@@ -623,6 +637,7 @@ function PnPCalib(data, editor) {
         } else {
             this.errorEl.textContent =
                 "求解失败: " + (this.result.error || "未知错误");
+            this.saveBtn.disabled = true;
             console.error("PnPCalib: solve failed", this.result);
         }
     };
@@ -654,6 +669,7 @@ function PnPCalib(data, editor) {
 
         if (saveResult.success) {
             console.log("PnPCalib: saved successfully");
+            this._savedExtrinsic = null; // 已保存，exit 时不要恢复旧外参
             this.exit();
         } else {
             this.errorEl.textContent =
@@ -973,6 +989,7 @@ function PnPCalib(data, editor) {
 
     this._updateUI = function () {
         var allPlaced = true;
+        var all3D = true;
         for (let i = 0; i < 4; i++) {
             var c = this.corners[i];
             if (c) {
@@ -982,8 +999,9 @@ function PnPCalib(data, editor) {
                 this.cornerEls[i].textContent = "--, --";
                 allPlaced = false;
             }
+            if (!this.points_3d || !this.points_3d[i]) all3D = false;
         }
-        this.solveBtn.disabled = !allPlaced;
+        this.solveBtn.disabled = !(allPlaced && all3D);
     };
 
     // ── 3D 角点选择 ──────────────────────────────────────────────────────────
