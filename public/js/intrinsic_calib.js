@@ -179,7 +179,6 @@ function IntrinsicCalib(data, editor) {
 
         for (var i = 0; i < results.length; i++) {
             var r = results[i];
-            // 找到对应的 image entry
             var img = this.images.find(function (x) { return x.filename === r.filename; });
             if (!img) continue;
 
@@ -192,7 +191,30 @@ function IntrinsicCalib(data, editor) {
         this._renderImageList();
 
         var failCount = results.length - successCount;
-        this._updateStatus("检测完成: " + successCount + " 成功, " + failCount + " 失败。可删除失败图片后计算内参。");
+        // 构建状态消息，如果有失败图片则附带清除按钮
+        this.statusEl.innerHTML = "";
+        var span = document.createElement("span");
+        span.textContent = "检测完成: " + successCount + " 成功, " + failCount + " 失败。";
+        this.statusEl.appendChild(span);
+
+        if (failCount > 0) {
+            var self = this;
+            var clearBtn = document.createElement("button");
+            clearBtn.className = "pnp-btn";
+            clearBtn.textContent = "清除失败图片";
+            clearBtn.style.cssText = "margin-left:8px;padding:2px 8px;font-size:12px;";
+            clearBtn.addEventListener("click", function () {
+                self.images = self.images.filter(function (x) { return x.success; });
+                self._renderImageList();
+                var okCount = self.images.length;
+                self.calcBtn.disabled = okCount < 3;
+                self.statusEl.innerHTML = "";
+                var s = document.createElement("span");
+                s.textContent = "已清除失败图片，剩余 " + okCount + " 张。";
+                self.statusEl.appendChild(s);
+            });
+            this.statusEl.appendChild(clearBtn);
+        }
 
         this.detectBtn.disabled = false;
         this.calcBtn.disabled = successCount < 3;
