@@ -113,7 +113,7 @@ function IntrinsicCalib(data, editor) {
         this.images = [];
         this.result = null;
         this._hideResult();
-        this.detectBtn.disabled = false;
+        this.detectBtn.disabled = true; // 等所有图片加载完再启用
         this.calcBtn.disabled = true;
         this.saveBtn.disabled = true;
 
@@ -123,19 +123,51 @@ function IntrinsicCalib(data, editor) {
         files.forEach(function (file) {
             var reader = new FileReader();
             reader.onload = function (ev) {
-                self.images.push({
-                    file: file,
-                    filename: file.name,
-                    success: null,
-                    preview: null,
-                    corners: null,
-                    dataUrl: ev.target.result
-                });
-                loaded++;
-                if (loaded === files.length) {
-                    self._renderImageList();
-                    self._updateStatus("已加载 " + files.length + " 张图片，点击\"检测角点\"");
-                }
+                var dataUrl = ev.target.result;
+                // 用 Image 获取真实尺寸
+                var tmpImg = new Image();
+                tmpImg.onload = function () {
+                    self.images.push({
+                        file: file,
+                        filename: file.name,
+                        success: null,
+                        preview: null,
+                        corners: null,
+                        dataUrl: dataUrl,
+                        width: tmpImg.naturalWidth,
+                        height: tmpImg.naturalHeight
+                    });
+                    loaded++;
+                    console.log("[IntrinsicCalib] 图片加载完成:", file.name,
+                        tmpImg.naturalWidth + "x" + tmpImg.naturalHeight,
+                        "(" + loaded + "/" + files.length + ")");
+                    if (loaded === files.length) {
+                        self._renderImageList();
+                        self.detectBtn.disabled = false;
+                        self._updateStatus("已加载 " + files.length + " 张图片，点击\"检测角点\"");
+                    }
+                };
+                tmpImg.onerror = function () {
+                    console.error("[IntrinsicCalib] 图片加载失败:", file.name);
+                    // 仍然添加到列表，但标记尺寸为 0
+                    self.images.push({
+                        file: file,
+                        filename: file.name,
+                        success: null,
+                        preview: null,
+                        corners: null,
+                        dataUrl: dataUrl,
+                        width: 0,
+                        height: 0
+                    });
+                    loaded++;
+                    if (loaded === files.length) {
+                        self._renderImageList();
+                        self.detectBtn.disabled = false;
+                        self._updateStatus("已加载 " + files.length + " 张图片（部分加载失败），点击\"检测角点\"");
+                    }
+                };
+                tmpImg.src = dataUrl;
             };
             reader.readAsDataURL(file);
         });
@@ -274,30 +306,47 @@ function IntrinsicCalib(data, editor) {
         var rows = parseInt(document.getElementById("intrinsic-rows").value) || 6;
         var cols = parseInt(document.getElementById("intrinsic-cols").value) || 9;
 
-        // 收集成功的图片
-        var imageDataList = [];
-        var pending = 0;
         var self = this;
-
         var successImages = this.images.filter(function (x) { return x.success && x.corners; });
         if (successImages.length < 3) {
             this._updateStatus("有效图片不足，至少需要3张");
             return;
         }
 
-        this._updateStatus("正在计算内参...");
+        // 检查图片尺寸是否已加载
+        var noDim = successImages.filter(function (x) { return !x.width || !x.height; });
+        if (noDim.length > 0) {
+            console.warn("[IntrinsicCalib] 以下图片尺寸未加载:", noDim.map(function (x) { return x.filename; }));
+        }
+
+        // 角点已在 img.corners 中缓存，直接使用
+        // 图片过多时抽样，避免 calibrateCamera 过慢
+        var MAX_CALIB_IMAGES = 50;
+        var selected = successImages;
+        if (successImages.length > MAX_CALIB_IMAGES) {
+            // 均匀抽样
+            var step = successImages.length / MAX_CALIB_IMAGES;
+            selected = [];
+            for (var i = 0; i < MAX_CALIB_IMAGES; i++) {
+                selected.push(successImages[Math.floor(i * step)]);
+            }
+        }
+
+        this._updateStatus("正在计算内参（使用 " + selected.length + "/" + successImages.length + " 张图片）...");
         this.calcBtn.disabled = true;
 
-        // 将每张图片转为 base64（去掉 data:image/...;base64, 前缀）
-        successImages.forEach(function (img) {
-            var base64 = img.dataUrl.split(",")[1];
-            imageDataList.push({
+        // 只发送缓存的角点坐标和图片尺寸
+        var imageDataList = selected.map(function (img) {
+            return {
                 filename: img.filename,
                 corners: img.corners,
-                image_base64: base64
-            });
-            pending++;
+                width: img.width || 0,
+                height: img.height || 0
+            };
         });
+
+        console.log("[IntrinsicCalib] 发送计算请求，图片数:", imageDataList.length,
+            "(共" + successImages.length + "张有效)");
 
         fetch("/calibrate_intrinsics", {
             method: "POST",
@@ -308,10 +357,16 @@ function IntrinsicCalib(data, editor) {
                 images: imageDataList
             })
         }).then(function (resp) {
+            console.log("[IntrinsicCalib] 响应状态:", resp.status);
+            if (!resp.ok) {
+                throw new Error("HTTP " + resp.status + " " + resp.statusText);
+            }
             return resp.json();
         }).then(function (data) {
+            console.log("[IntrinsicCalib] 计算结果:", data);
             self._onCalibrateResult(data);
         }).catch(function (err) {
+            console.error("[IntrinsicCalib] 计算失败:", err);
             self._updateStatus("计算失败: " + err.message);
             self.calcBtn.disabled = false;
         });
@@ -325,19 +380,23 @@ function IntrinsicCalib(data, editor) {
         }
 
         this.result = data;
-        this._showResult(data);
-        this._updateStatus("内参计算完成，重投影误差: " + data.error.toFixed(4) + " px");
+        var okCount = this.images.filter(function (x) { return x.success; }).length;
+        this._showResult(data, okCount);
+        var msg = "内参计算完成，使用 " + data.image_count + "/" + okCount + " 张图片，";
+        msg += "重投影误差: " + data.error.toFixed(4) + " px";
+        this._updateStatus(msg);
         this.calcBtn.disabled = false;
         this.saveBtn.disabled = false;
     };
 
     // ── 结果显示 ──────────────────────────────────────────────────────
 
-    this._showResult = function (data) {
+    this._showResult = function (data, totalValid) {
         var resultEl = document.getElementById("intrinsic-result");
         resultEl.style.display = "";
 
-        document.getElementById("intrinsic-img-count").textContent = data.image_count;
+        var countText = data.image_count + (totalValid ? " / " + totalValid : "");
+        document.getElementById("intrinsic-img-count").textContent = countText;
         document.getElementById("intrinsic-error").textContent = data.error.toFixed(4);
 
         // 显示 3x3 内参矩阵

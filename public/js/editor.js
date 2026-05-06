@@ -159,12 +159,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                 (lidar_points)=>this.on_img_click(lidar_points));
 
         // 去畸变切换时通知 PnP 面板（boxEditor 尚未创建，延迟引用）
-        var pnpCalib = this.pnpCalib;
         var editor = this;
         this.imageContextManager._onUndistortToggle = function() {
-            if (pnpCalib && pnpCalib.active) {
-                pnpCalib._loadImage();
-            }
             // 刷新 box editor 缩略图
             if (editor.boxEditor && editor.boxEditor.box) {
                 editor.boxEditor.focusImageContext.updateFocusedImageContext(editor.boxEditor.box);

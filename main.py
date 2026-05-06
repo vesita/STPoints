@@ -484,12 +484,13 @@ class Root(object):
     @cherrypy.tools.json_in()
     def calibrate_intrinsics(self):
         """使用检测到的角点计算相机内参。"""
-        import base64
 
         data = cherrypy.request.json
         rows = int(data.get("rows", 6))
         cols = int(data.get("cols", 9))
-        image_data_list = data.get("images", [])  # [{filename, corners, image_base64}]
+        image_data_list = data.get("images", [])  # [{filename, corners, width, height}]
+
+        print(f"[calibrate_intrinsics] 收到请求: rows={rows}, cols={cols}, 图片数={len(image_data_list)}")
 
         objp = np.zeros((rows * cols, 3), np.float32)
         objp[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2)
@@ -500,14 +501,16 @@ class Root(object):
 
         for item in image_data_list:
             corners = np.array(item["corners"], dtype=np.float32).reshape(-1, 1, 2)
-            img_bytes = base64.b64decode(item["image_base64"])
-            arr = np.frombuffer(img_bytes, dtype=np.uint8)
-            img = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
-            if img is None:
+            w = int(item.get("width", 0))
+            h = int(item.get("height", 0))
+            if w <= 0 or h <= 0:
+                print(f"[calibrate_intrinsics] 跳过 {item.get('filename')}: 尺寸无效 ({w}x{h})")
                 continue
-            image_size = (img.shape[1], img.shape[0])
+            image_size = (w, h)
             obj_points.append(objp)
             img_points.append(corners)
+
+        print(f"[calibrate_intrinsics] 有效图片: {len(obj_points)}, image_size={image_size}")
 
         if len(obj_points) < 3:
             return {"success": False, "error": f"有效图片不足（{len(obj_points)}张，至少需要3张）"}
@@ -554,6 +557,23 @@ class Root(object):
 
 
 if __name__ == '__main__':
+    import threading, signal
+
+    # 解决 CherryPy autoreload 重启时卡死的问题：
+    # 当收到 SIGINT (Ctrl+C) 或 autoreloader 触发重启时，
+    # 如果引擎在 5 秒内没有完成停止，强制退出进程。
+    def _shutdown_watchdog():
+        import time
+        while cherrypy.engine.running:
+            time.sleep(0.5)
+        # engine.running 变为 False，说明正在停止
+        time.sleep(5)
+        # 5 秒后如果还没退出，强制退出
+        os._exit(0)
+
+    _wd = threading.Thread(target=_shutdown_watchdog, daemon=True)
+    _wd.start()
+
     cherrypy.quickstart(Root(), '/', config="server.conf")
 else:
     application = cherrypy.Application(Root(), '/', config="server.conf")

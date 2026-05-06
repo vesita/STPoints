@@ -308,7 +308,6 @@ function PnPCalib(data, editor) {
             if (!camName) return;
             var img = this.data.world.cameras.getImageByName(camName);
             if (!img) return;
-            var pnp = this;
 
             // 设置 SVG viewBox 匹配图片自然尺寸
             var w = img.naturalWidth || 2048;
@@ -317,28 +316,8 @@ function PnPCalib(data, editor) {
             this.imageEl.setAttribute("width", w);
             this.imageEl.setAttribute("height", h);
 
-            // 检查去畸变模式
-            var mgr = this.editor && this.editor.imageContextManager;
-            if (mgr && mgr._undistorted) {
-                var fi = this.data.world.frameInfo;
-                var url = "/undistort?scene=" + encodeURIComponent(fi.scene)
-                    + "&camera=" + encodeURIComponent(camName)
-                    + "&frame=" + encodeURIComponent(fi.frame);
-                var resp = fetch(url).then(function(r) {
-                    if (!r.ok) throw new Error(r.statusText);
-                    return r.blob();
-                }).then(function(blob) {
-                    var dataUrl = URL.createObjectURL(blob);
-                    pnp.imageEl.setAttribute("xlink:href", dataUrl);
-                }).catch(function(e) {
-                    console.warn("PnPCalib: undistort failed, using original", e);
-                    pnp.imageEl.setAttribute("xlink:href", img.src);
-                });
-                // 先用原图占位
-                this.imageEl.setAttribute("xlink:href", img.src);
-            } else {
-                this.imageEl.setAttribute("xlink:href", img.src);
-            }
+            // 始终使用原始图像（不解畸变），保证像素坐标和 dist_coeffs 一致
+            this.imageEl.setAttribute("xlink:href", img.src);
 
             // 图片可能已缓存加载完成，手动触发尺寸更新
             if (img.complete) {
