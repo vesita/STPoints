@@ -6,7 +6,8 @@ import { MovableView } from "./popup_dialog.js";
 function BoxImageContext(ui){
 
     this.ui = ui;
-    
+    this._imageSourceProvider = null; // ImageContextManager, set externally
+
     // draw highlighted box
     this.updateFocusedImageContext = function(box){
         var scene_meta = box.world.frameInfo.sceneMeta;
@@ -17,44 +18,63 @@ function BoxImageContext(ui){
             box.position);
 
         if (!bestImage){
-            return;           
+            return;
         }
 
         if (!scene_meta.calib.camera){
             return;
         }
-        
+
         var calib = scene_meta.calib.camera[bestImage]
         if (!calib){
             return;
         }
-        
+
         if (calib){
-            var img = box.world.cameras.getImageByName(bestImage);
-            if (img && (img.naturalWidth > 0)){
-
-                this.clear_canvas();
-
-                var imgfinal = box_to_2d_points(box, calib)
-
-                if (imgfinal != null){  // if projection is out of range of the image, stop drawing.
-                    var ctx = this.ui.getContext("2d");
-                    ctx.lineWidth = 0.5;
-
-                    // note: 320*240 should be adjustable
-                    var crop_area = crop_image(img.naturalWidth, img.naturalHeight, ctx.canvas.width, ctx.canvas.height, imgfinal);
-
-                    ctx.drawImage(img, crop_area[0], crop_area[1],crop_area[2], crop_area[3], 0, 0, ctx.canvas.width, ctx.canvas.height);// ctx.canvas.clientHeight);
-                    //ctx.drawImage(img, 0,0,img.naturalWidth, img.naturalHeight, 0, 0, 320, 180);// ctx.canvas.clientHeight);
-                    var imgfinal = vectorsub(imgfinal, [crop_area[0],crop_area[1]]);
-                    var trans_ratio = {
-                        x: ctx.canvas.height/crop_area[3],
-                        y: ctx.canvas.height/crop_area[3],
-                    }
-
-                    draw_box_on_image(ctx, box, imgfinal, trans_ratio, true);
-                }
+            // 优先使用去畸变图像
+            var img = null;
+            var self = this;
+            if (this._imageSourceProvider) {
+                img = this._imageSourceProvider.getImageForCamera(box.world, bestImage);
             }
+            if (!img) {
+                img = box.world.cameras.getImageByName(bestImage);
+            }
+
+            // 如果是字符串 URL（去畸变缓存），需要先加载为 Image
+            if (typeof img === 'string') {
+                var imgUrl = img;
+                var imgObj = new Image();
+                imgObj.onload = function() {
+                    self._drawFocusedImage(box, calib, imgObj);
+                };
+                imgObj.src = imgUrl;
+            } else if (img && (img.naturalWidth > 0)) {
+                this._drawFocusedImage(box, calib, img);
+            }
+        }
+    }
+
+    this._drawFocusedImage = function(box, calib, img) {
+        this.clear_canvas();
+
+        var imgfinal = box_to_2d_points(box, calib)
+
+        if (imgfinal != null){  // if projection is out of range of the image, stop drawing.
+            var ctx = this.ui.getContext("2d");
+            ctx.lineWidth = 0.5;
+
+            // note: 320*240 should be adjustable
+            var crop_area = crop_image(img.naturalWidth, img.naturalHeight, ctx.canvas.width, ctx.canvas.height, imgfinal);
+
+            ctx.drawImage(img, crop_area[0], crop_area[1],crop_area[2], crop_area[3], 0, 0, ctx.canvas.width, ctx.canvas.height);
+            var imgfinal = vectorsub(imgfinal, [crop_area[0],crop_area[1]]);
+            var trans_ratio = {
+                x: ctx.canvas.height/crop_area[3],
+                y: ctx.canvas.height/crop_area[3],
+            }
+
+            draw_box_on_image(ctx, box, imgfinal, trans_ratio, true);
         }
     }
 
@@ -1167,6 +1187,17 @@ class ImageContextManager {
         // 通知 PnP 面板重新加载（如果打开）
         if (this._onUndistortToggle) this._onUndistortToggle();
         return this._undistorted;
+    }
+
+    /** 获取指定相机的图像源（去畸变模式返回缓存的 dataURL，否则返回原始 Image） */
+    getImageForCamera(world, camName) {
+        if (this._undistorted) {
+            var cacheKey = world.frameInfo.scene + "/" + camName + "/" + world.frameInfo.frame;
+            if (this._undistortCache[cacheKey]) {
+                return this._undistortCache[cacheKey];
+            }
+        }
+        return world.cameras.getImageByName(camName);
     }
 
     hide(){
