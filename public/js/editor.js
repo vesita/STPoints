@@ -26,6 +26,7 @@ import {globalKeyDownManager} from './keydown_manager.js';
 import {vector_range} from "./util.js"
 import { checkScene } from './error_check.js';
 import { MeasureTool } from './measure.js';
+import { IntrinsicCalib } from './intrinsic_calib.js';
 
 function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
@@ -62,6 +63,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
     this.calib = new Calib(this.data, this);
     this.pnpCalib = new PnPCalib(this.data, this);
     this.measureTool = new MeasureTool(this);
+    this.intrinsicCalib = new IntrinsicCalib(this.data, this);
 
     this.header = null;
     this.imageContextManager = null;
@@ -84,6 +86,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
         this.configUi = new ConfigUi(editorUi.querySelector("#config-button"), editorUi.querySelector("#config-wrapper"), this);
 
         if (this.pnpCalib) this.pnpCalib.init();
+        if (this.intrinsicCalib) this.intrinsicCalib.init();
 
         // 测量按钮事件绑定
         var measureBtn = editorUi.querySelector("#measure-button");
@@ -100,6 +103,14 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                 if (!self.data || !self.data.world) return;
                 var active = self.imageContextManager.toggleUndistort();
                 undistortBtn.classList.toggle("active", active);
+            });
+        }
+
+        // 内参标定按钮事件绑定
+        var intrinsicBtn = editorUi.querySelector("#intrinsic-calib-button");
+        if (intrinsicBtn) {
+            intrinsicBtn.addEventListener("click", function() {
+                self.intrinsicCalib.enter();
             });
         }
 

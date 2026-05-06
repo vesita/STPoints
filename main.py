@@ -426,6 +426,132 @@ class Root(object):
         cherrypy.response.headers['Content-Type'] = 'image/jpeg'
         return buf.tobytes()
 
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def detect_corners(self, **kwargs):
+        """检测棋盘格角点。接收 multipart form: images[], rows, cols"""
+        import base64
+
+        rows = int(kwargs.get("rows", 6))
+        cols = int(kwargs.get("cols", 9))
+        # CherryPy 将 multipart 文件放在 kwargs 中
+        files = kwargs.get("images")
+        if not files:
+            # 单文件时不是列表
+            files = [kwargs.get("image")] if kwargs.get("image") else []
+        if not isinstance(files, list):
+            files = [files]
+
+        results = []
+        for f in files:
+            if not f:
+                continue
+            filename = getattr(f, "filename", "unknown")
+            raw = f.file.read()
+            arr = np.frombuffer(raw, dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            if img is None:
+                results.append({"filename": filename, "success": False, "error": "无法解码图片"})
+                continue
+
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            ret, corners = cv2.findChessboardCorners(
+                gray, (cols, rows),
+                cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE
+            )
+
+            if ret:
+                criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+                corners = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+                # 画角点预览
+                preview = img.copy()
+                cv2.drawChessboardCorners(preview, (cols, rows), corners, ret)
+                _, buf = cv2.imencode('.jpg', preview)
+                preview_b64 = base64.b64encode(buf).decode('ascii')
+                # 返回角点坐标（扁平数组）
+                corner_list = corners.reshape(-1, 2).tolist()
+                results.append({
+                    "filename": filename, "success": True,
+                    "preview": preview_b64, "corners": corner_list
+                })
+            else:
+                results.append({"filename": filename, "success": False, "error": "未检测到棋盘格角点"})
+
+        return {"results": results}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    @cherrypy.tools.json_in()
+    def calibrate_intrinsics(self):
+        """使用检测到的角点计算相机内参。"""
+        import base64
+
+        data = cherrypy.request.json
+        rows = int(data.get("rows", 6))
+        cols = int(data.get("cols", 9))
+        image_data_list = data.get("images", [])  # [{filename, corners, image_base64}]
+
+        objp = np.zeros((rows * cols, 3), np.float32)
+        objp[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2)
+
+        obj_points = []
+        img_points = []
+        image_size = None
+
+        for item in image_data_list:
+            corners = np.array(item["corners"], dtype=np.float32).reshape(-1, 1, 2)
+            img_bytes = base64.b64decode(item["image_base64"])
+            arr = np.frombuffer(img_bytes, dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
+            if img is None:
+                continue
+            image_size = (img.shape[1], img.shape[0])
+            obj_points.append(objp)
+            img_points.append(corners)
+
+        if len(obj_points) < 3:
+            return {"success": False, "error": f"有效图片不足（{len(obj_points)}张，至少需要3张）"}
+
+        rms, K, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
+            obj_points, img_points, image_size, None, None
+        )
+
+        return {
+            "success": True,
+            "intrinsic": K.flatten().tolist(),
+            "dist_coeffs": dist_coeffs.flatten().tolist(),
+            "error": float(rms),
+            "image_count": len(obj_points)
+        }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    @cherrypy.tools.json_in()
+    def save_intrinsics(self):
+        """保存内参和畸变系数到标定文件。"""
+        data = cherrypy.request.json
+        scene = data["scene"]
+        camera = data["camera"]
+        intrinsic = data["intrinsic"]
+        dist_coeffs = data["dist_coeffs"]
+
+        calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
+        if not os.path.isfile(calib_file):
+            # 创建新的标定文件
+            os.makedirs(os.path.dirname(calib_file), exist_ok=True)
+            calib_data = {}
+        else:
+            with open(calib_file) as f:
+                calib_data = json.load(f)
+
+        calib_data["intrinsic"] = intrinsic
+        calib_data["dist_coeffs"] = dist_coeffs
+
+        with open(calib_file, "w") as f:
+            json.dump(calib_data, f, indent=2)
+
+        return {"success": True}
+
 
 if __name__ == '__main__':
     cherrypy.quickstart(Root(), '/', config="server.conf")

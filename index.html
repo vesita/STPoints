@@ -108,6 +108,17 @@
 									</g>
 								</svg>
 							</div>
+							<div id="intrinsic-calib-button" class="ui-button" title="相机内参标定">
+								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button">
+									<g>
+										<rect x="2" y="2" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+										<line x1="2" y1="8" x2="22" y2="8" stroke="currentColor" stroke-width="1"/>
+										<line x1="2" y1="14" x2="22" y2="14" stroke="currentColor" stroke-width="1"/>
+										<line x1="8" y1="2" x2="8" y2="22" stroke="currentColor" stroke-width="1"/>
+										<line x1="14" y1="2" x2="14" y2="22" stroke="currentColor" stroke-width="1"/>
+									</g>
+								</svg>
+							</div>
 						</div>
 					</div>
 
@@ -1153,6 +1164,45 @@
 						</div>
 					</div>
 				</div>
+
+			</div>
+			<!-- 内参标定侧边栏 -->
+			<div id="intrinsic-calib-wrapper" style="display:none">
+				<div id="intrinsic-calib-panel">
+					<div id="intrinsic-calib-header">
+						<span>相机内参标定</span>
+						<div id="intrinsic-calib-exit" class="ui-button" title="关闭">
+							<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
+								<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
+							</g></svg>
+						</div>
+					</div>
+					<div id="intrinsic-calib-body">
+						<div class="intrinsic-config">
+							<label>列数: <input type="number" id="intrinsic-cols" value="9" min="2" max="30"></label>
+							<label>行数: <input type="number" id="intrinsic-rows" value="6" min="2" max="30"></label>
+							<span class="intrinsic-hint">（内角点数）</span>
+						</div>
+						<div class="intrinsic-upload">
+							<input type="file" id="intrinsic-file-input" multiple accept="image/*" style="display:none">
+							<button id="intrinsic-upload-btn" class="pnp-btn">选择图片</button>
+							<button id="intrinsic-detect-btn" class="pnp-btn pnp-btn-primary" disabled>检测角点</button>
+						</div>
+						<div id="intrinsic-status"></div>
+						<div id="intrinsic-image-list"></div>
+						<div id="intrinsic-result" style="display:none">
+							<div class="intrinsic-result-header">标定结果</div>
+							<div>图片数: <span id="intrinsic-img-count">--</span> | 重投影误差: <span id="intrinsic-error">--</span> px</div>
+							<textarea id="intrinsic-matrix" readonly rows="4"></textarea>
+							<div>畸变系数: <span id="intrinsic-dist">--</span></div>
+						</div>
+						<div class="intrinsic-buttons">
+							<button id="intrinsic-calc-btn" class="pnp-btn" disabled>计算内参</button>
+							<button id="intrinsic-save-btn" class="pnp-btn pnp-btn-save" disabled>保存</button>
+						</div>
+					</div>
+				</div>
+			</div>
 
 		</template>
 		<template id="box-editor-ui-template"><div id="sub-views">
