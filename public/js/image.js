@@ -1296,6 +1296,10 @@ function box_to_2d_points(box, calib){
 // points3d is length 4 row vector, homogeneous coordinates
 // returns 2d row vectors
 function points3d_homo_to_image2d(points3d, calib, accept_partial=false,save_map, img_dx, img_dy){
+    if (!calib || !calib.extrinsic || !calib.intrinsic) {
+        console.warn("points3d_homo_to_image2d: incomplete calib data");
+        return null;
+    }
     var imgpos = matmul(calib.extrinsic, points3d, 4);
     
     //rect matrix shall be applied here, for kitti
@@ -1382,13 +1386,15 @@ function all_points_in_image_range(p){
 
 function  choose_best_camera_for_point(scene_meta, center){
         
-    if (!scene_meta.calib){
+    if (!scene_meta.calib || !scene_meta.calib.camera){
         return null;
     }
 
     var proj_pos = [];
     for (var i in scene_meta.calib.camera){
-        var imgpos = matmul(scene_meta.calib.camera[i].extrinsic, [center.x,center.y,center.z,1], 4);
+        var ext = scene_meta.calib.camera[i].extrinsic;
+        if (!ext) continue;
+        var imgpos = matmul(ext, [center.x,center.y,center.z,1], 4);
         proj_pos.push({calib: i, pos: vector4to3(imgpos)});
     }
 

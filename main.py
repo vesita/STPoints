@@ -300,7 +300,10 @@ class Root(object):
         with open(calib_file) as f:
             calib_data = json.load(f)
 
-        camera_matrix = calib_data["intrinsic"]
+        intrinsic = calib_data.get("intrinsic")
+        if not intrinsic:
+            return {"success": False, "error": f"calib file missing intrinsic: {calib_file}"}
+        camera_matrix = intrinsic
         dist_coeffs = calib_data.get("dist_coeffs")
 
         result = solve_pnp_ippe(points_3d, points_2d, camera_matrix, dist_coeffs)
@@ -326,7 +329,10 @@ class Root(object):
         with open(calib_file) as f:
             calib_data = json.load(f)
 
-        camera_matrix = calib_data["intrinsic"]
+        intrinsic = calib_data.get("intrinsic")
+        if not intrinsic:
+            return {"success": False, "error": f"calib file missing intrinsic: {calib_file}"}
+        camera_matrix = intrinsic
         dist_coeffs = calib_data.get("dist_coeffs")
 
         print(f"[brute] input points_3d={points_3d}")
@@ -368,11 +374,13 @@ class Root(object):
         extrinsic = data["extrinsic"]
 
         calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
-        if not os.path.isfile(calib_file):
-            return {"success": False, "error": f"calib file not found: {calib_file}"}
-
-        with open(calib_file) as f:
-            calib_data = json.load(f)
+        if os.path.isfile(calib_file):
+            with open(calib_file) as f:
+                calib_data = json.load(f)
+        else:
+            # 文件不存在时自动创建
+            os.makedirs(os.path.dirname(calib_file), exist_ok=True)
+            calib_data = {}
 
         calib_data["extrinsic"] = extrinsic
 
@@ -542,7 +550,7 @@ class Root(object):
         if not os.path.isfile(calib_file):
             # 创建新的标定文件
             os.makedirs(os.path.dirname(calib_file), exist_ok=True)
-            calib_data = {}
+            calib_data = {"extrinsic": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]}
         else:
             with open(calib_file) as f:
                 calib_data = json.load(f)
