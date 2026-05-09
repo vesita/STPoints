@@ -927,6 +927,10 @@
 									<div class="menu-item" id="cfg-start-pnp">
 										<div class="menu-item-text">PnP 外参矫正</div>
 									</div>
+
+									<div class="menu-item" id="cfg-calib-preview">
+										<div class="menu-item-text">标定效果预览</div>
+									</div>
 									
 									<div class="menu-item" id="cfg-crop-scene">
 										<div class="menu-item-text">裁剪场景</div>				
@@ -1205,6 +1209,26 @@
 			</div>
 
 		</template>
+n				<!-- 标定效果预览 -->
+				<div id="calib-preview-wrapper" style="display:none">
+					<div id="calib-preview-panel">
+						<div id="calib-preview-header">
+							<span>标定效果预览</span>
+							<div id="calib-preview-exit" class="ui-button" title="关闭">
+								<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" class="svg-button"><g>
+									<path d="M4 4 L 20 20 M 20 4 L 4 20"></path>
+								</g></svg>
+							</div>
+						</div>
+						<div id="calib-preview-body">
+							<div id="calib-preview-controls">
+								<button id="calib-preview-generate-btn" class="pnp-btn">生成预览</button>
+								<span id="calib-preview-status"></span>
+							</div>
+							<div id="calib-preview-gallery"></div>
+						</div>
+					</div>
+				</div>
 		<template id="box-editor-ui-template"><div id="sub-views">
 				<div class="box-info non-selectable" id="box-info"></div>
 				<div class="view-manipulator"  id="z-view-manipulator"  tabindex="-1">

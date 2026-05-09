@@ -27,6 +27,7 @@ import {vector_range} from "./util.js"
 import { checkScene } from './error_check.js';
 import { MeasureTool } from './measure.js';
 import { IntrinsicCalib } from './intrinsic_calib.js';
+import { CalibPreview } from './calib_preview.js';
 
 function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
 
@@ -64,6 +65,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
     this.pnpCalib = new PnPCalib(this.data, this);
     this.measureTool = new MeasureTool(this);
     this.intrinsicCalib = new IntrinsicCalib(this.data, this);
+    this.calibPreview = new CalibPreview(this);
 
     this.header = null;
     this.imageContextManager = null;
@@ -2102,6 +2104,8 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
                     this.intrinsicCalib.exit();
                     var ib = editorUi.querySelector("#intrinsic-calib-button");
                     if (ib) ib.classList.remove("active");
+                } else if (this.calibPreview && this.calibPreview.active) {
+                    this.calibPreview.exit();
                 } else if (this.selected_box) {
                     this.unselectBox(null);
                 }

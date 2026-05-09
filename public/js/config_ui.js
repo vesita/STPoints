@@ -78,6 +78,11 @@ class ConfigUi{
 
             return true;
         },
+
+        "#cfg-calib-preview": (event)=>{
+            this.editor.calibPreview.enter();
+            return true;
+        },
         
     };
 

@@ -1622,6 +1622,132 @@ td {
 	word-break: break-all;
 }
 
+/* ── 标定效果预览 ─────────────────────────────────────── */
+
+#calib-preview-wrapper {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	background: rgba(0,0,0,0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+#calib-preview-panel {
+	width: 90vw;
+	height: 85vh;
+	background: var(--window-background-color);
+	border: 1px solid var(--widget-background-color);
+	border-radius: 8px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+#calib-preview-header {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 16px;
+	background: var(--window-background-color);
+	border-bottom: 1px solid var(--widget-background-color);
+	font-weight: bold;
+	font-size: 14px;
+}
+
+#calib-preview-body {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: 12px;
+	gap: 10px;
+}
+
+#calib-preview-controls {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-shrink: 0;
+}
+
+#calib-preview-status {
+	font-size: 12px;
+	color: #aaa;
+}
+
+#calib-preview-gallery {
+	flex: 1;
+	display: flex;
+	flex-wrap: wrap;
+	align-content: flex-start;
+	gap: 12px;
+	overflow-y: auto;
+	padding: 4px;
+	min-height: 0;
+}
+
+.calib-preview-card {
+	position: relative;
+	width: 320px;
+	border: 2px solid #555;
+	border-radius: 6px;
+	overflow: hidden;
+	cursor: pointer;
+	transition: border-color 0.15s, transform 0.15s;
+	flex-shrink: 0;
+	background: #000;
+}
+.calib-preview-card:hover {
+	border-color: #8af;
+}
+.calib-preview-card.calib-preview-card-expanded {
+	position: fixed;
+	inset: 5vh 5vw;
+	width: auto;
+	height: auto;
+	z-index: 1001;
+	border-color: #4af;
+	background: #000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.calib-preview-card.calib-preview-card-expanded img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	width: auto;
+	height: auto;
+}
+.calib-preview-card img {
+	width: 100%;
+	height: 200px;
+	object-fit: cover;
+	display: block;
+}
+
+.calib-preview-card-info {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	padding: 3px 6px;
+	background: rgba(0,0,0,0.6);
+	color: #ddd;
+	font-size: 11px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.calib-preview-card.calib-preview-card-expanded .calib-preview-card-info {
+	display: none;
+}
+
+
 .intrinsic-buttons {
 	display: flex;
 	gap: 8px;

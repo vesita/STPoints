@@ -33,6 +33,34 @@ from algos import pre_annotate
 # sys.path.append(os.path.join(BASE_DIR, './tools'))
 # import tools.dataset_preprocess.crop_scene as crop_scene
 
+def _euler_to_rotmat(rx, ry, rz):
+    """ZYX 欧拉角 → 3×3 旋转矩阵（与 JS euler_angle_to_rotate_matrix 一致）"""
+    Rx = np.array([[1, 0, 0],
+                   [0, np.cos(rx), -np.sin(rx)],
+                   [0, np.sin(rx), np.cos(rx)]])
+    Ry = np.array([[np.cos(ry), 0, np.sin(ry)],
+                   [0, 1, 0],
+                   [-np.sin(ry), 0, np.cos(ry)]])
+    Rz = np.array([[np.cos(rz), -np.sin(rz), 0],
+                   [np.sin(rz), np.cos(rz), 0],
+                   [0, 0, 1]])
+    return Rz @ Ry @ Rx
+
+
+def _psr_to_8_corners(position, scale, rotation):
+    """PSR 标注框 → 8 个世界坐标角点（与 JS psr_to_xyz 一致）"""
+    R = _euler_to_rotmat(rotation["x"], rotation["y"], rotation["z"])
+    t = np.array([position["x"], position["y"], position["z"]])
+    sx, sy, sz = scale["x"] / 2, scale["y"] / 2, scale["z"] / 2
+    local = np.array([
+        [sx,  sy, -sz], [sx, -sy, -sz],  # FLB, FRB
+        [sx, -sy,  sz], [sx,  sy,  sz],  # FRT, FLT
+        [-sx, sy, -sz], [-sx, -sy, -sz], # RLB, RRB
+        [-sx, -sy, sz], [-sx, sy,  sz],  # RRT, RLT
+    ])
+    return (R @ local.T).T + t
+
+
 class Root(object):
     @cherrypy.expose
     def index(self, scene="", frame=""):
@@ -562,6 +590,143 @@ class Root(object):
             json.dump(calib_data, f, indent=2)
 
         return {"success": True}
+
+
+    # ── Calibration preview ────────────────────────────────────────────────
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    @cherrypy.tools.json_in()
+    def render_calibration_preview(self):
+        """遍历场景中所有有标注的帧，将 3D 标注框通过当前外参+内参投影到 2D 图像并保存。"""
+        import cv2
+        import numpy as np
+
+        data = cherrypy.request.json
+        scene = data["scene"]
+        camera_name = data.get("camera")
+
+        scene_meta = scene_reader.get_one_scene(scene)
+        cameras = scene_meta.get("camera", [])
+        if not cameras:
+            return {"success": False, "error": "场景中无 camera 文件夹"}
+
+        if camera_name not in cameras:
+            camera_name = cameras[0]
+
+        calib = scene_meta.get("calib", {}).get("camera", {}).get(camera_name)
+        if not calib:
+            return {"success": False, "error": f"camera {camera_name} 无标定文件"}
+
+        intrinsic = calib.get("intrinsic")
+        extrinsic = calib.get("extrinsic")
+        dist_coeffs = calib.get("dist_coeffs")
+
+        if not intrinsic or not extrinsic:
+            return {"success": False, "error": "标定文件缺少 intrinsic 或 extrinsic"}
+
+        K = np.array(intrinsic, dtype=np.float64).reshape(3, 3)
+        ext = np.array(extrinsic, dtype=np.float64).reshape(4, 4)
+        R_mat = ext[:3, :3]
+        t_vec = ext[:3, 3]
+        rvec, _ = cv2.Rodrigues(R_mat)
+        dist = np.array(dist_coeffs, dtype=np.float64).reshape(-1, 1) if dist_coeffs else None
+
+        frames = scene_meta.get("frames", [])
+        camera_ext = scene_meta.get("camera_ext", ".jpg")
+
+        out_dir = os.path.join("./temp", "calib_preview", scene)
+        os.makedirs(out_dir, exist_ok=True)
+
+        # 8 colours for up to 8 boxes per frame
+        BOX_COLORS = [
+            (0, 200, 0),    # green
+            (0, 100, 255),  # blue
+            (50, 50, 255),  # red
+            (255, 200, 0),  # cyan
+            (255, 0, 200),  # magenta
+            (0, 200, 200),  # yellow
+            (100, 200, 0),  # lime
+            (200, 100, 0),  # orange
+        ]
+
+        results = []
+        total_err = 0.0
+        err_count = 0
+
+        for frame in frames:
+            ann = scene_reader.read_annotations(scene, frame)
+            if not ann:
+                continue
+
+            img_path = os.path.join("./data", scene, "camera", camera_name, frame + camera_ext)
+            img = cv2.imread(img_path)
+            if img is None:
+                continue
+
+            overlay = img.copy()
+            h, w = img.shape[:2]
+
+            for bi, box in enumerate(ann[:8]):
+                psr = box.get("psr", {})
+                pos = psr.get("position", {})
+                scl = psr.get("scale", {})
+                rot = psr.get("rotation", {})
+
+                world_corners = _psr_to_8_corners(pos, scl, rot)
+                corners_2d, _ = cv2.projectPoints(world_corners, rvec, t_vec, K, dist)
+                pts = corners_2d.reshape(-1, 2).astype(np.int32)
+
+                color = BOX_COLORS[bi % len(BOX_COLORS)]
+                dim_color = tuple(c // 2 for c in color)
+
+                # front face: 0-1-2-3
+                for i, j in [(0, 1), (1, 2), (2, 3), (3, 0)]:
+                    cv2.line(overlay, tuple(pts[i]), tuple(pts[j]), color, 2)
+
+                # rear face: 4-5-6-7
+                for i, j in [(4, 5), (5, 6), (6, 7), (7, 4)]:
+                    cv2.line(overlay, tuple(pts[i]), tuple(pts[j]), dim_color, 1)
+
+                # connections front→rear
+                for i, j in [(0, 4), (1, 5), (2, 6), (3, 7)]:
+                    cv2.line(overlay, tuple(pts[i]), tuple(pts[j]), dim_color, 1, cv2.LINE_AA)
+
+                # label
+                label = f"{box.get('obj_type', '?')} #{box.get('obj_id', '?')}"
+                label_pos = (pts[0][0], max(pts[0][1] - 6, 12))
+                cv2.putText(overlay, label, label_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+                # compute projected box centre spread (pseudo-error metric)
+                centre_2d = pts.mean(axis=0)
+                spread = np.sqrt(np.sum((pts - centre_2d) ** 2, axis=1)).max()
+                total_err += spread
+                err_count += 1
+
+            # semi-transparent overlay
+            cv2.addWeighted(overlay, 0.6, img, 0.4, 0, img)
+
+            # frame info
+            info = f"{frame} | {len(ann)} obj"
+            cv2.putText(img, info, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(img, info, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+
+            out_path = os.path.join(out_dir, f"{camera_name}_{frame}.jpg")
+            cv2.imwrite(out_path, img)
+
+            results.append({
+                "frame": frame,
+                "num_boxes": len(ann),
+                "image_url": f"/temp/calib_preview/{scene}/{camera_name}_{frame}.jpg"
+            })
+
+        return {
+            "success": True,
+            "scene": scene,
+            "camera": camera_name,
+            "total_frames": len(results),
+            "frames": results
+        }
 
 
 if __name__ == '__main__':
