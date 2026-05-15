@@ -27,14 +27,34 @@ def solve_pnp_ippe(points_3d, points_2d, camera_matrix, dist_coeffs=None):
     pts_2d = np.asarray(points_2d, dtype=np.float64).reshape(-1, 2)
     K = np.asarray(camera_matrix, dtype=np.float64).reshape(3, 3)
 
+    # 预检：检查点是否过于紧凑（所有点间距太小导致 IPPE 退化）
+    center = pts_3d.mean(axis=0)
+    centered = pts_3d - center
+    max_dist = np.sqrt(np.max(np.sum(centered ** 2, axis=1)))
+    if max_dist < 0.05:
+        return {"success": False, "error": f"3D 点过于集中 (最大间距 {max_dist:.3f}m)，无法求解 PnP"}
+
+    # 预检：检查 2D 点是否有效
+    img_center = pts_2d.mean(axis=0)
+    img_radius = np.sqrt(np.max(np.sum((pts_2d - img_center) ** 2, axis=1)))
+    if img_radius < 5.0:
+        return {"success": False, "error": f"2D 点过于集中 (半径 {img_radius:.1f}px)，无法求解 PnP"}
+
     if dist_coeffs is not None and len(dist_coeffs) > 0:
         dist = np.asarray(dist_coeffs, dtype=np.float64).reshape(-1, 1)
     else:
         dist = np.zeros((4, 1), dtype=np.float64)
 
-    retval, rvec, tvec = cv2.solvePnP(
-        pts_3d, pts_2d, K, dist, flags=cv2.SOLVEPNP_IPPE
-    )
+    try:
+        retval, rvec, tvec = cv2.solvePnP(
+            pts_3d, pts_2d, K, dist, flags=cv2.SOLVEPNP_IPPE
+        )
+    except cv2.error as e:
+        print(f"[solve_pnp_ippe] OpenCV error: {e}")
+        return {
+            "success": False,
+            "error": f"IPPE 求解失败: {str(e)}",
+        }
     print(f"[solve_pnp_ippe] pts_3d=\n{pts_3d}")
     print(f"[solve_pnp_ippe] pts_2d=\n{pts_2d}")
     print(f"[solve_pnp_ippe] rvec={rvec.flatten()}, tvec={tvec.flatten()}")

@@ -10,4 +10,5 @@ dependencies = [
     "opencv-python>=4.13.0.92",
     "tensorflow>=2.10,<2.11",
     "tensorflow-io-gcs-filesystem<0.32",
+    "toml>=0.10.2",
 ]

@@ -4,6 +4,7 @@ import string
 import cherrypy
 import os
 import json
+import toml
 import cv2
 import numpy as np
 from jinja2 import Environment, FileSystemLoader
@@ -102,14 +103,16 @@ class Root(object):
     def saveworldlist(self):
 
       # cl = cherrypy.request.headers['Content-Length']
-      rawbody = cherrypy.request.body.readline().decode('UTF-8')
+      rawbody = cherrypy.request.body.read().decode('UTF-8')
       data = json.loads(rawbody)
 
       for d in data:
         scene = d["scene"]
         frame = d["frame"]
         ann = d["annotation"]
-        with open("./data/"+scene +"/label/"+frame+".json",'w') as f:
+        label_dir = os.path.join("./data", scene, "label")
+        os.makedirs(label_dir, exist_ok=True)
+        with open(os.path.join(label_dir, frame+".json"), 'w') as f:
           json.dump(ann, f, indent=2, sort_keys=True)
 
       return "ok"
@@ -201,7 +204,7 @@ class Root(object):
     @cherrypy.expose    
     @cherrypy.tools.json_out()
     def loadworldlist(self):
-      rawbody = cherrypy.request.body.readline().decode('UTF-8')
+      rawbody = cherrypy.request.body.read().decode('UTF-8')
       worldlist = json.loads(rawbody)
 
       anns = list(map(lambda w:{
@@ -311,91 +314,101 @@ class Root(object):
     @cherrypy.tools.json_in()
     def solve_pnp(self):
         """Compute extrinsic via IPPE from 4 2D–3D correspondences (no save)."""
-        data = cherrypy.request.json
-        scene = data["scene"]
-        camera = data["camera"]
-        points_3d = data["points_3d"]
-        points_2d = data["points_2d"]
+        try:
+            data = cherrypy.request.json
+            scene = data["scene"]
+            camera = data["camera"]
+            points_3d = data["points_3d"]
+            points_2d = data["points_2d"]
 
-        print(f"[solve_pnp] scene={scene} camera={camera}")
-        print(f"[solve_pnp] 3D: {points_3d}")
-        print(f"[solve_pnp] 2D: {points_2d}")
+            print(f"[solve_pnp] scene={scene} camera={camera}")
+            print(f"[solve_pnp] 3D: {points_3d}")
+            print(f"[solve_pnp] 2D: {points_2d}")
 
-        calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
-        if not os.path.isfile(calib_file):
-            return {"success": False, "error": f"calib file not found: {calib_file}"}
+            calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
+            if not os.path.isfile(calib_file):
+                return {"success": False, "error": f"calib file not found: {calib_file}"}
 
-        with open(calib_file) as f:
-            calib_data = json.load(f)
+            with open(calib_file) as f:
+                calib_data = json.load(f)
 
-        intrinsic = calib_data.get("intrinsic")
-        if not intrinsic:
-            return {"success": False, "error": f"calib file missing intrinsic: {calib_file}"}
-        camera_matrix = intrinsic
-        dist_coeffs = calib_data.get("dist_coeffs")
+            intrinsic = calib_data.get("intrinsic")
+            if not intrinsic:
+                return {"success": False, "error": f"calib file missing intrinsic: {calib_file}"}
+            camera_matrix = intrinsic
+            dist_coeffs = calib_data.get("dist_coeffs")
 
-        result = solve_pnp_ippe(points_3d, points_2d, camera_matrix, dist_coeffs)
-        return result
+            result = solve_pnp_ippe(points_3d, points_2d, camera_matrix, dist_coeffs)
+            return result
+        except Exception as e:
+            print(f"[solve_pnp] UNHANDLED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "error": f"solve_pnp 内部错误: {str(e)}"}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
     @cherrypy.tools.json_in()
     def brute_force_pnp(self):
         """穷举 24 种点序排列，返回每种的重投影误差。"""
-        import itertools
+        try:
+            import itertools
 
-        data = cherrypy.request.json
-        scene = data["scene"]
-        camera = data["camera"]
-        points_3d = data["points_3d"]
-        points_2d = data["points_2d"]
+            data = cherrypy.request.json
+            scene = data["scene"]
+            camera = data["camera"]
+            points_3d = data["points_3d"]
+            points_2d = data["points_2d"]
 
-        calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
-        if not os.path.isfile(calib_file):
-            return {"success": False, "error": f"calib file not found: {calib_file}"}
+            calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
+            if not os.path.isfile(calib_file):
+                return {"success": False, "error": f"calib file not found: {calib_file}"}
 
-        with open(calib_file) as f:
-            calib_data = json.load(f)
+            with open(calib_file) as f:
+                calib_data = json.load(f)
 
-        intrinsic = calib_data.get("intrinsic")
-        if not intrinsic:
-            return {"success": False, "error": f"calib file missing intrinsic: {calib_file}"}
-        camera_matrix = intrinsic
-        dist_coeffs = calib_data.get("dist_coeffs")
+            intrinsic = calib_data.get("intrinsic")
+            if not intrinsic:
+                return {"success": False, "error": f"calib file missing intrinsic: {calib_file}"}
+            camera_matrix = intrinsic
+            dist_coeffs = calib_data.get("dist_coeffs")
 
-        print(f"[brute] input points_3d={points_3d}")
-        print(f"[brute] input points_2d={points_2d}")
+            print(f"[brute] input points_3d={points_3d}")
+            print(f"[brute] input points_2d={points_2d}")
 
-        results = []
-        best = {"error": float("inf"), "perm": None}
+            results = []
+            best = {"error": float("inf"), "perm": None}
 
-        for perm in itertools.permutations(range(4)):
-            # 固定 3D 点顺序，只置换 2D 点 → 测试不同 3D-2D 配对
-            p3d = points_3d
-            p2d = [points_2d[i] for i in perm]
+            for perm in itertools.permutations(range(4)):
+                p3d = points_3d
+                p2d = [points_2d[i] for i in perm]
 
-            res = solve_pnp_ippe(p3d, p2d, camera_matrix, dist_coeffs)
-            err = res.get("reprojection_error", float("inf"))
-            results.append({"perm": list(perm), "error": err, "success": res.get("success", False), "extrinsic": res.get("extrinsic")})
+                res = solve_pnp_ippe(p3d, p2d, camera_matrix, dist_coeffs)
+                err = res.get("reprojection_error", float("inf"))
+                results.append({"perm": list(perm), "error": err, "success": res.get("success", False), "extrinsic": res.get("extrinsic")})
 
-            if err < best["error"]:
-                best["error"] = err
-                best["perm"] = list(perm)
-                best["extrinsic"] = res.get("extrinsic")
+                if err < best["error"]:
+                    best["error"] = err
+                    best["perm"] = list(perm)
+                    best["extrinsic"] = res.get("extrinsic")
 
-        # 检查是否所有误差相同
-        unique_errors = set(round(r["error"], 2) for r in results)
-        print(f"[brute] best={best['perm']}, error={best['error']:.2f}")
-        print(f"[brute] unique error values ({len(unique_errors)}): {sorted(unique_errors)}")
-        if len(unique_errors) == 1:
-            print(f"[brute] 所有 24 种排列误差完全相同 = {results[0]['error']:.2f}px → 3D 点共线退化")
-        return {"success": True, "results": results, "best": best}
+            unique_errors = set(round(r["error"], 2) for r in results)
+            print(f"[brute] best={best['perm']}, error={best['error']:.2f}")
+            print(f"[brute] unique error values ({len(unique_errors)}): {sorted(unique_errors)}")
+            if len(unique_errors) == 1:
+                print(f"[brute] 所有 24 种排列误差完全相同 = {results[0]['error']:.2f}px → 3D 点共线退化")
+            return {"success": True, "results": results, "best": best}
+        except Exception as e:
+            print(f"[brute_force_pnp] UNHANDLED ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "error": f"brute_force_pnp 内部错误: {str(e)}"}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
     @cherrypy.tools.json_in()
     def calib_save(self):
-        """Persist extrinsic matrix to calib file on disk."""
+        """Persist extrinsic matrix to calib file on disk, also export TOML."""
         data = cherrypy.request.json
         scene = data["scene"]
         camera = data["camera"]
@@ -414,6 +427,30 @@ class Root(object):
 
         with open(calib_file, "w") as f:
             json.dump(calib_data, f, indent=2)
+
+        # ── 同步导出 TOML ────────────────────────────────────────────────
+        toml_path = os.path.join("./data", scene, "calib", "camera", camera + ".toml")
+        toml_data = {"camera": {}}
+        intrinsic = calib_data.get("intrinsic")
+        dist_coeffs = calib_data.get("dist_coeffs")
+        if intrinsic:
+            # 扁平 9 元素 → 3×3 嵌套列表
+            K = intrinsic
+            if len(K) == 9:
+                K = [K[0:3], K[3:6], K[6:9]]
+            toml_data["camera"]["intrinsic"] = K
+        if extrinsic:
+            # 扁平 16 元素 → 4×4 嵌套列表
+            E = extrinsic
+            if len(E) == 16:
+                E = [E[0:4], E[4:8], E[8:12], E[12:16]]
+            toml_data["camera"]["extrinsic"] = E
+        if dist_coeffs:
+            toml_data["camera"]["dist_coeffs"] = dist_coeffs
+
+        with open(toml_path, "w") as f:
+            toml.dump(toml_data, f)
+        print(f"[calib_save] TOML exported: {toml_path}")
 
         return {"success": True}
 

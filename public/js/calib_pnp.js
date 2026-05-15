@@ -427,6 +427,33 @@ function PnPCalib(data, editor) {
         if (this._manualPickIndex >= 4) return;
 
         var idx = this._manualPickIndex;
+
+        // 校验：点到原点的距离不能太远（超过 100m 说明点选到了远处物体上）
+        var distFromOrigin = Math.sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+        if (distFromOrigin > 100) {
+            console.warn("PnPCalib: rejected P" + idx + " — too far from origin (" +
+                distFromOrigin.toFixed(1) + "m)");
+            this.editor.measureTool._showStatus(
+                "点距离原点太远 (" + distFromOrigin.toFixed(1) + "m)，请选择靠近车辆的物体角点");
+            return; // 不增加 idx，让用户重新选
+        }
+
+        // 校验：与第一个点的距离不能太远（超过 50m 说明跨度太大）
+        var firstPt = this.points_3d[0];
+        if (firstPt !== null) {
+            var dx = point.x - firstPt[0];
+            var dy = point.y - firstPt[1];
+            var dz = point.z - firstPt[2];
+            var distFromFirst = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (distFromFirst > 50) {
+                console.warn("PnPCalib: rejected P" + idx + " — too far from P0 (" +
+                    distFromFirst.toFixed(1) + "m)");
+                this.editor.measureTool._showStatus(
+                    "点距离 P0 太远 (" + distFromFirst.toFixed(1) + "m)，请选择同一物体上的角点");
+                return;
+            }
+        }
+
         this.points_3d[idx] = [point.x, point.y, point.z];
 
         console.log("PnPCalib: manual 3D point P" + idx + "=" +
@@ -531,6 +558,16 @@ function PnPCalib(data, editor) {
         var pts = this.points_3d;
         if (!pts || pts.some(function(p){ return p === null; })) return null;
 
+        // 计算中心点距离原点的距离
+        var cx = (pts[0][0] + pts[1][0] + pts[2][0] + pts[3][0]) / 4;
+        var cy = (pts[0][1] + pts[1][1] + pts[2][1] + pts[3][1]) / 4;
+        var cz = (pts[0][2] + pts[1][2] + pts[2][2] + pts[3][2]) / 4;
+        var centerDist = Math.sqrt(cx * cx + cy * cy + cz * cz);
+        if (centerDist > 80) {
+            return "3D点群距离原点太远（中心 " + centerDist.toFixed(0) +
+                "m），请选择靠近车辆的物体角点";
+        }
+
         // 计算 3 个方向的跨度
         var mins = [Infinity, Infinity, Infinity];
         var maxs = [-Infinity, -Infinity, -Infinity];
@@ -547,7 +584,7 @@ function PnPCalib(data, editor) {
 
         console.log("PnPCalib: 3D distribution ranges=[" +
             ranges[0].toFixed(3) + ", " + ranges[1].toFixed(3) + ", " + ranges[2].toFixed(3) +
-            "] min/max ratio=" + ratio.toFixed(3));
+            "] min/max ratio=" + ratio.toFixed(3) + " centerDist=" + centerDist.toFixed(1) + "m");
 
         // 如果最小跨度与最大跨度之比 < 0.15，认为过于共线
         if (ratio < 0.15) {
@@ -591,6 +628,13 @@ function PnPCalib(data, editor) {
                     points_2d: this.corners.map(function (c) { return [c.u, c.v]; }),
                 }),
             });
+            if (!response.ok) {
+                var text = await response.text();
+                this.errorEl.textContent = "服务器错误 (" + response.status + ")";
+                this.saveBtn.disabled = true;
+                console.error("PnPCalib: HTTP " + response.status, text.slice(0, 200));
+                return;
+            }
             this.result = await response.json();
         } catch (e) {
             this.errorEl.textContent = "网络错误";
@@ -714,6 +758,13 @@ function PnPCalib(data, editor) {
                     points_2d: this.corners.map(function (c) { return [c.u, c.v]; }),
                 }),
             });
+            if (!resp.ok) {
+                var text = await resp.text();
+                this.errorEl.textContent = "服务器错误 (" + resp.status + ")";
+                this.bruteBtn.disabled = false;
+                console.error("PnPCalib: brute force HTTP " + resp.status, text.slice(0, 200));
+                return;
+            }
             var data = await resp.json();
         } catch (e) {
             this.errorEl.textContent = "网络错误";
