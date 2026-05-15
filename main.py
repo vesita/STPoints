@@ -13,26 +13,14 @@ env = Environment(loader=FileSystemLoader('./'))
 
 import sys
 import scene_reader
-from tools import check_labels  as check
+from tools import check_labels as check
 from calibpy.calib_pnp import solve_pnp_ippe
-
-
-# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# sys.path.append(BASE_DIR)
-
-#sys.path.append(os.path.join(BASE_DIR, './algos'))
-#import algos.rotation as rotation
 from algos import pre_annotate
 
+def _sanitize_name(name):
+    """只允许字母/数字/下划线/连字符，防止路径穿越."""
+    return bool(re.match(r'^[\w\-]+$', name))
 
-#sys.path.append(os.path.join(BASE_DIR, '../tracking'))
-#import algos.trajectory as trajectory
-
-# extract_object_exe = "~/code/pcltest/build/extract_object"
-# registration_exe = "~/code/go_icp_pcl/build/test_go_icp"
-
-# sys.path.append(os.path.join(BASE_DIR, './tools'))
-# import tools.dataset_preprocess.crop_scene as crop_scene
 
 def _euler_to_rotmat(rx, ry, rz):
     """ZYX 欧拉角 → 3×3 旋转矩阵（与 JS euler_angle_to_rotate_matrix 一致）"""
@@ -70,13 +58,11 @@ class Root(object):
   
     @cherrypy.expose
     def icon(self):
-      tmpl = env.get_template('test_icon.html')
-      return tmpl.render()
+      raise cherrypy.HTTPError(404, "not available")
 
     @cherrypy.expose
     def ml(self):
-      tmpl = env.get_template('test_ml.html')
-      return tmpl.render()
+      raise cherrypy.HTTPError(404, "not available")
   
     @cherrypy.expose
     def reg(self):
@@ -87,17 +73,6 @@ class Root(object):
     def view(self, file):
       tmpl = env.get_template('view.html')
       return tmpl.render()
-
-    # @cherrypy.expose
-    # def saveworld(self, scene, frame):
-
-    #   # cl = cherrypy.request.headers['Content-Length']
-    #   rawbody = cherrypy.request.body.readline().decode('UTF-8')
-
-    #   with open("./data/"+scene +"/label/"+frame+".json",'w') as f:
-    #     f.write(rawbody)
-      
-    #   return "ok"
 
     @cherrypy.expose
     def saveworldlist(self):
@@ -128,21 +103,25 @@ class Root(object):
       rawbody = cherrypy.request.body.read().decode('UTF-8')
       data = json.loads(rawbody)
 
-      rawdata = data["rawSceneId"]
-      timestamp = rawdata.split("_")[0]
+      rawdata = data.get("rawSceneId", "")
 
       # 路径穿越/注入防护
-      if not re.match(r'^[\w\-]+$', timestamp):
+      if not re.match(r'^[\w\-]+$', rawdata):
           return {"code": -1, "log": ["invalid rawSceneId"]}
-      safe_start = re.sub(r'[^\w\-\:\.]', '', data["startTime"])
-      safe_seconds = re.sub(r'[^\w\-\.]', '', data["seconds"])
-      safe_desc = re.sub(r'[^\w\-]', '', data["desc"])
+      safe_start = re.sub(r'[^\w\-\:\.]', '', data.get("startTime", ""))
+      safe_seconds = re.sub(r'[^\w\-\.]', '', data.get("seconds", ""))
+      safe_desc = re.sub(r'[^\w\-]', '', data.get("desc", ""))
+
+      # 检查工具脚本是否存在
+      crop_script = os.path.join(".", "tools", "dataset_preprocess", "crop_scene.py")
+      if not os.path.isfile(crop_script):
+          return {"code": -1, "log": [f"crop_scene tool not found: {crop_script}"]}
 
       print("generate scene")
-      log_file = "temp/crop-scene-"+timestamp+".log"
+      log_file = "temp/crop-scene-" + rawdata + ".log"
 
-      cmd = "python ./tools/dataset_preprocess/crop_scene.py generate " + \
-        rawdata[0:10]+"/"+timestamp + "_preprocessed/dataset_2hz " + \
+      cmd = "python " + crop_script + " generate " + \
+        rawdata[0:10] + "/" + rawdata + "_preprocessed/dataset_2hz " + \
         "- " + \
         safe_start + " " + \
         safe_seconds + " " + \
@@ -152,10 +131,12 @@ class Root(object):
 
       code = os.system(cmd)
 
-      with open(log_file) as f:
-        log = list(map(lambda s: s.strip(), f.readlines()))
-
-      os.remove(log_file)
+      if os.path.isfile(log_file):
+          with open(log_file) as f:
+            log = list(map(lambda s: s.strip(), f.readlines()))
+          os.remove(log_file)
+      else:
+          log = [f"log file not created (cmd exited {code})"]
 
       return {"code": code,
               "log": log
@@ -171,14 +152,6 @@ class Root(object):
       return ck.messages
 
 
-    # @cherrypy.expose
-    # @cherrypy.tools.json_out()
-    # def interpolate(self, scene, frame, obj_id):
-    #   # interpolate_num = trajectory.predict(scene, obj_id, frame, None)
-    #   # return interpolate_num
-    #   return 0
-
-    # data  N*3 numpy array
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def predict_rotation(self):
@@ -190,12 +163,16 @@ class Root(object):
       #return {}
 
     
-    @cherrypy.expose    
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def auto_annotate(self, scene, frame):
-      print("auto annotate ", scene, frame)
-      return pre_annotate.annotate_file('./data/{}/lidar/{}.pcd'.format(scene,frame))
-      
+      """自动标注（当前版本已禁用，流水线已移除）."""
+      if not _sanitize_name(scene) or not _sanitize_name(frame):
+          return {"success": False, "error": "invalid scene or frame"}
+      result = pre_annotate.annotate_file('./data/{}/lidar/{}.pcd'.format(scene, frame))
+      if not result:
+          return {"success": False, "error": "auto-annotate 已禁用（流水线已移除）"}
+      return {"success": True, "annotations": result}
 
 
     @cherrypy.expose    
@@ -225,40 +202,7 @@ class Root(object):
       return anns
         
 
-    # @cherrypy.expose    
-    # @cherrypy.tools.json_out()
-    # def auto_adjust(self, scene, ref_frame, object_id, adj_frame):
-      
-    #   #os.chdir("./temp")
-    #   os.system("rm ./temp/src.pcd ./temp/tgt.pcd ./temp/out.pcd ./temp/trans.json")
-
-
-    #   tgt_pcd_file = "./data/"+scene +"/lidar/"+ref_frame+".pcd"
-    #   tgt_json_file = "./data/"+scene +"/label/"+ref_frame+".json"
-
-    #   src_pcd_file = "./data/"+scene +"/lidar/"+adj_frame+".pcd"      
-    #   src_json_file = "./data/"+scene +"/label/"+adj_frame+".json"
-
-    #   cmd = extract_object_exe +" "+ src_pcd_file + " " + src_json_file + " " + object_id + " " +"./temp/src.pcd"
-    #   print(cmd)
-    #   os.system(cmd)
-
-    #   cmd = extract_object_exe + " "+ tgt_pcd_file + " " + tgt_json_file + " " + object_id + " " +"./temp/tgt.pcd"
-    #   print(cmd)
-    #   os.system(cmd)
-
-    #   cmd = registration_exe + " ./temp/tgt.pcd ./temp/src.pcd ./temp/out.pcd ./temp/trans.json"
-    #   print(cmd)
-    #   os.system(cmd)
-
-    #   with open("./temp/trans.json", "r") as f:
-    #     trans = json.load(f)
-    #     print(trans)
-    #     return trans
-
-    #   return {}
-
-    @cherrypy.expose    
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def datameta(self):
       return scene_reader.get_all_scenes()
@@ -330,6 +274,9 @@ class Root(object):
             points_3d = data["points_3d"]
             points_2d = data["points_2d"]
 
+            if not _sanitize_name(scene) or not _sanitize_name(camera):
+                return {"success": False, "error": "invalid scene or camera name"}
+
             print(f"[solve_pnp] scene={scene} camera={camera}")
             print(f"[solve_pnp] 3D: {points_3d}")
             print(f"[solve_pnp] 2D: {points_2d}")
@@ -368,6 +315,9 @@ class Root(object):
             camera = data["camera"]
             points_3d = data["points_3d"]
             points_2d = data["points_2d"]
+
+            if not _sanitize_name(scene) or not _sanitize_name(camera):
+                return {"success": False, "error": "invalid scene or camera name"}
 
             calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
             if not os.path.isfile(calib_file):

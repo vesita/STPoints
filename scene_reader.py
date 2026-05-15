@@ -18,6 +18,8 @@ def get_all_scene_desc():
     return descs
 
 def get_scene_names():
+      if not os.path.isdir(root_dir):
+          return []
       scenes = os.listdir(root_dir)
       scenes = filter(lambda s: os.path.isdir(os.path.join(root_dir, s, "lidar")), scenes)
       scenes = filter(lambda s: not os.path.exists(os.path.join(root_dir, s, "disable")), scenes)
@@ -41,7 +43,11 @@ def get_one_scene(s):
 
     scene_dir = os.path.join(root_dir, s)
 
-    frames = os.listdir(os.path.join(scene_dir, "lidar"))
+    lidar_dir = os.path.join(scene_dir, "lidar")
+    if not os.path.isdir(lidar_dir):
+        return scene
+
+    frames = os.listdir(lidar_dir)
     
     #print(s, frames)
     frames.sort()
@@ -53,14 +59,6 @@ def get_one_scene(s):
         scene["frames"].append(filename)
         scene["lidar_ext"] = fileext
 
-    # point_transform_matrix=[]
-
-    # if os.path.isfile(os.path.join(scene_dir, "point_transform.txt")):
-    #     with open(os.path.join(scene_dir, "point_transform.txt"))  as f:
-    #         point_transform_matrix=f.read()
-    #         point_transform_matrix = point_transform_matrix.split(",")
-
-    
     if os.path.exists(os.path.join(scene_dir, "desc.json")):
         with open(os.path.join(scene_dir, "desc.json")) as f:
             desc = json.load(f)
@@ -167,51 +165,19 @@ def get_one_scene(s):
     scene["aux_lidar_ext"] = aux_lidar_ext
 
 
-    # # ego_pose
-    # ego_pose= {}
-    # ego_pose_path = os.path.join(scene_dir, "ego_pose")
-    # if os.path.exists(ego_pose_path):
-    #     poses = os.listdir(ego_pose_path)
-    #     for p in poses:
-    #         p_file = os.path.join(ego_pose_path, p)
-    #         with open(p_file)  as f:
-    #                 pose = json.load(f)
-    #                 ego_pose[os.path.splitext(p)[0]] = pose
-
-
-    if  True: #not os.path.isdir(os.path.join(scene_dir, "bbox.xyz")):
-        scene["boxtype"] = "psr"
-        # if point_transform_matrix:
-        #     scene["point_transform_matrix"] = point_transform_matrix
-        if camera:
-            scene["camera"] = camera
-        if radar:
-            scene["radar"] = radar
-        if aux_lidar:
-            scene["aux_lidar"] = aux_lidar
-        if calib_camera:
-            calib["camera"] = calib_camera
-        if calib_radar:
-            calib["radar"] = calib_radar
-        if calib_aux_lidar:
-            calib["aux_lidar"] = calib_aux_lidar
-        # if ego_pose:
-        #     scene["ego_pose"] = ego_pose
-            
-    # else:
-    #     scene["boxtype"] = "xyz"
-    #     if point_transform_matrix:
-    #         scene["point_transform_matrix"] = point_transform_matrix
-    #     if camera:
-    #         scene["camera"] = camera
-    #     if radar:
-    #         scene["radar"] = radar
-    #     if calib_camera:
-    #         calib["camera"] = calib_camera
-    #     if calib_radar:
-    #         calib["radar"] = calib_radar
-    #     if calib_aux_lidar:
-    #         calib["aux_lidar"] = calib_aux_lidar
+    scene["boxtype"] = "psr"
+    if camera:
+        scene["camera"] = camera
+    if radar:
+        scene["radar"] = radar
+    if aux_lidar:
+        scene["aux_lidar"] = aux_lidar
+    if calib_camera:
+        calib["camera"] = calib_camera
+    if calib_radar:
+        calib["radar"] = calib_radar
+    if calib_aux_lidar:
+        calib["aux_lidar"] = calib_aux_lidar
 
     scene["calib"] = calib
 

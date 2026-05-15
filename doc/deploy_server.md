@@ -1,27 +1,19 @@
-# Introduction
+# uWSGI 部署
 
-[uWSGI](https://uwsgi-docs.readthedocs.io/)
-
-You can run it with `python ./main.py` or `uwsgi --ini uwsgi.ini`
-
-
-# Requirements
+## 安装
 
 ```
 pip install uwsgi
 ```
 
-# Config
-```
---- file: uwsgi.ini ---
+## 配置
 
+uwsgi 配置文件 `uwsgi.ini`（默认端口 8092）：
+
+```ini
 [uwsgi]
-# Set the IP and Port.
 http = 0.0.0.0:8092
-
-# **Importance**: Need rewrite the value of chdir key
 chdir = /root/SUSTechPOINTS
-
 module = main:application
 master = true
 buffer-size = 65536
@@ -29,8 +21,18 @@ processes = 4
 threads = 2
 ```
 
-# Run
+## 使用 CherryPy 直接运行（推荐，默认端口 8081）
+
+```
+python main.py
+```
+
+然后访问 http://127.0.0.1:8081
+
+## uwsgi 运行
 
 ```
 uwsgi --ini uwsgi.ini
 ```
+
+然后访问 http://127.0.0.1:8092

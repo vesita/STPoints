@@ -1,22 +1,26 @@
-
 ### Install
 
 0. clone the project
    ```
-   git clone https://github.com/naurril/SUSTechPOINTS
+   git clone <your-repo-url>
    ```
-1. Install packages
-     ```
-     pip install -r requirement.txt
-     ```
-2. Download model
+1. Install dependencies (choose one)
+   ```
+   # uv (recommended)
+   uv sync
 
-     download pretrained model file [deep_annotation_inference.h5](https://github.com/naurril/SUSTechPOINTS/releases/download/0.1/deep_annotation_inference.h5), put it into `./algos/models`
-     ```
-     wget https://github.com/naurril/SUSTechPOINTS/releases/download/0.1/deep_annotation_inference.h5  -P algos/models
-     ```
+   # or pip
+   pip install -r requirement.txt
+   ```
+2. Download model (optional, for auto-rotate feature)
+
+   Download [deep_annotation_inference.h5](https://github.com/naurril/SUSTechPOINTS/releases/download/0.1/deep_annotation_inference.h5), put it into `./algos/models`
+   ```
+   wget https://github.com/naurril/SUSTechPOINTS/releases/download/0.1/deep_annotation_inference.h5 -P algos/models
+   ```
 
 ### Start
+
 Run the following command in shell, then go to http://127.0.0.1:8081
 ```
 python main.py
@@ -24,13 +28,13 @@ python main.py
 
 ## Object type configuration
 
-Default object configuration is in [obj_cfg.js](src/public/js/../../../public/js/obj_cfg.js)
+Default object configuration is in `public/js/obj_cfg.js`
 
 Adjust the contents to customize.
 
 ## Data preparation
 
-````
+```
    +- data
        +- scene1
           +- lidar
@@ -63,8 +67,7 @@ Adjust the contents to customize.
                +- 0000.json
                +- 0001.json
        +- scene2
-
-````
+```
 
 label is the directory to save the annotation result.
 

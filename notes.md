@@ -1,9 +1,8 @@
-1. the views on the left are 3 orthographical cameras installed in the scene according to the selected box. keys 5/6/7 to show/hide the installed camera frames.
+# 开发笔记
 
-2. we use rear-view, other than front-view, so that when we adjust the position of box, this view moves 
-in the same direction as the top-down view, otherwise it would be very confusing (imagine the box in the 
-first view moves right but in the second view moves left.)
+## 视角说明
+1. 左侧三个子视图是正交相机（后视图而非前视图），这样调整 box 位置时子视图和俯视图运动方向一致。
+2. 主视图默认是透视相机。
 
-2. the main view is a perspective camera by default.
-
-
+## 快捷键
+快捷键详情见 doc/shortcuts_cn.md

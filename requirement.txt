@@ -1,5 +1,8 @@
-tensorflow>=2.1
-jinja2
-cherrypy
-filterpy
-cheroot != 8.4.4
+# 依赖定义见 pyproject.toml（uv 管理）
+# 此文件保持同步以便 pip 直接安装
+tensorflow>=2.10,<2.11
+jinja2>=3.1.6
+cherrypy>=18.10.0
+opencv-python>=4.13.0.92
+toml>=0.10.2
+tensorflow-io-gcs-filesystem<0.32
