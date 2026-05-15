@@ -97,7 +97,7 @@ print(rotate_matrix)
 
 lidar_folder = rootdir + "/lidar"
 
-lidars = os.listdir(lidar_folder).sort()
+lidars = sorted(os.listdir(lidar_folder))
 
 for l in lidars:
     f = lidar_folder + "/" + l

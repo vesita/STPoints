@@ -240,8 +240,10 @@ def predict(scene_id, obj_id, current_frame, predict_frame):
     print("start save ..")
     updated_frames = []
     for i,a in enumerate(annotations):
+      if a is None:
+        continue
       print(a.get("annotator"), "\t", a["psr"]["position"])
-      if a and a.get("annotator") and (a["annotator"]=="K" or a["annotator"]=="I"):
+      if a.get("annotator") and (a["annotator"]=="K" or a["annotator"]=="I"):
         write_annotation_back(scene_id, frames[i], a)
         updated_frames.append(frames[i])
 

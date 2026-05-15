@@ -13,7 +13,7 @@ class LabelChecker:
         self.def_labels = [
         "Car","Pedestrian","Van","Bus","Truck","ScooterRider","Scooter","BicycleRider","Bicycle","Motorcycle","MotorcyleRider","PoliceCar","TourCar","RoadWorker","Child",
         "BabyCart","Cart","Cone","FireHydrant","SaftyTriangle","PlatformCart","ConstructionCart","RoadBarrel","TrafficBarrier","LongVehicle","BicycleGroup","ConcreteTruck",
-        "Tram","Excavator","Animal","TrashCan","ForkLift","Trimotorcycle","FreightTricycle,","Crane","RoadRoller","Bulldozer","DontCare","Misc","Unknown","Unknown1","Unknown2",
+        "Tram","Excavator","Animal","TrashCan","ForkLift","Trimotorcycle","FreightTricycle","Crane","RoadRoller","Bulldozer","DontCare","Misc","Unknown","Unknown1","Unknown2",
         "Unknown3","Unknown4","Unknown5",
         ]
 
@@ -137,7 +137,7 @@ class LabelChecker:
             
             for axis in ['x','y','z']:
                 rotation_delta = label['psr']['rotation'][axis] -  plabel['psr']['rotation'][axis]
-                pi = 3.141592543
+                pi = np.pi
                 if rotation_delta > pi:
                     rotation_delta =  2*pi - rotation_delta
                 elif rotation_delta < -pi:

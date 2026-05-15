@@ -1,5 +1,6 @@
 import random
 import string
+import re
 
 import cherrypy
 import os
@@ -10,7 +11,6 @@ import numpy as np
 from jinja2 import Environment, FileSystemLoader
 env = Environment(loader=FileSystemLoader('./'))
 
-import os
 import sys
 import scene_reader
 from tools import check_labels  as check
@@ -110,6 +110,10 @@ class Root(object):
         scene = d["scene"]
         frame = d["frame"]
         ann = d["annotation"]
+
+        # 路径穿越防护：只允许字母/数字/下划线/连字符
+        if not re.match(r'^[\w\-]+$', scene) or not re.match(r'^[\w\-]+$', frame):
+            return {"success": False, "error": "invalid scene or frame name"}
         label_dir = os.path.join("./data", scene, "label")
         os.makedirs(label_dir, exist_ok=True)
         with open(os.path.join(label_dir, frame+".json"), 'w') as f:
@@ -121,22 +125,28 @@ class Root(object):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def cropscene(self):
-      rawbody = cherrypy.request.body.readline().decode('UTF-8')
+      rawbody = cherrypy.request.body.read().decode('UTF-8')
       data = json.loads(rawbody)
-      
-      rawdata = data["rawSceneId"]
 
+      rawdata = data["rawSceneId"]
       timestamp = rawdata.split("_")[0]
+
+      # 路径穿越/注入防护
+      if not re.match(r'^[\w\-]+$', timestamp):
+          return {"code": -1, "log": ["invalid rawSceneId"]}
+      safe_start = re.sub(r'[^\w\-\:\.]', '', data["startTime"])
+      safe_seconds = re.sub(r'[^\w\-\.]', '', data["seconds"])
+      safe_desc = re.sub(r'[^\w\-]', '', data["desc"])
 
       print("generate scene")
       log_file = "temp/crop-scene-"+timestamp+".log"
 
-      cmd = "python ./tools/dataset_preprocess/crop_scene.py generate "+ \
+      cmd = "python ./tools/dataset_preprocess/crop_scene.py generate " + \
         rawdata[0:10]+"/"+timestamp + "_preprocessed/dataset_2hz " + \
-        "- " +\
-        data["startTime"] + " " +\
-        data["seconds"] + " " +\
-        "\""+ data["desc"] + "\"" +\
+        "- " + \
+        safe_start + " " + \
+        safe_seconds + " " + \
+        "\"" + safe_desc + "\"" + \
         "> " + log_file + " 2>&1"
       print(cmd)
 
@@ -145,8 +155,8 @@ class Root(object):
       with open(log_file) as f:
         log = list(map(lambda s: s.strip(), f.readlines()))
 
-      os.system("rm "+log_file)
-      
+      os.remove(log_file)
+
       return {"code": code,
               "log": log
               }
@@ -169,11 +179,10 @@ class Root(object):
     #   return 0
 
     # data  N*3 numpy array
-    @cherrypy.expose    
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def predict_rotation(self):
-      cl = cherrypy.request.headers['Content-Length']
-      rawbody = cherrypy.request.body.readline().decode('UTF-8')
+      rawbody = cherrypy.request.body.read().decode('UTF-8')
       
       data = json.loads(rawbody)
       
@@ -283,7 +292,7 @@ class Root(object):
       def file_2_objs(f):
           with open(f) as fd:
               boxes = json.load(fd)
-              objs = [x for x in map(lambda b: {"category":b["obj_type"], "id": b["obj_id"]}, boxes)]
+              objs = [x for x in map(lambda b: {"category": b.get("obj_type", "?"), "id": b.get("obj_id", "?")}, boxes)]
               return objs
 
       boxes = map(lambda f: file_2_objs(os.path.join(path, "label", f)), files)
@@ -414,6 +423,10 @@ class Root(object):
         camera = data["camera"]
         extrinsic = data["extrinsic"]
 
+        # 路径穿越防护
+        if not re.match(r'^[\w\-]+$', scene) or not re.match(r'^[\w\-]+$', camera):
+            return {"success": False, "error": "invalid scene or camera name"}
+
         calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
         if os.path.isfile(calib_file):
             with open(calib_file) as f:
@@ -499,8 +512,6 @@ class Root(object):
         cherrypy.response.headers['Content-Type'] = 'image/jpeg'
         return buf.tobytes()
 
-    @cherrypy.expose
-    @cherrypy.tools.json_out()
     def detect_corners(self, **kwargs):
         """检测棋盘格角点。接收 multipart form: images[], rows, cols"""
         import base64
@@ -611,6 +622,10 @@ class Root(object):
         intrinsic = data["intrinsic"]
         dist_coeffs = data["dist_coeffs"]
 
+        # 路径穿越防护
+        if not re.match(r'^[\w\-]+$', scene) or not re.match(r'^[\w\-]+$', camera):
+            return {"success": False, "error": "invalid scene or camera name"}
+
         calib_file = os.path.join("./data", scene, "calib", "camera", camera + ".json")
         if not os.path.isfile(calib_file):
             # 创建新的标定文件
@@ -636,9 +651,6 @@ class Root(object):
     @cherrypy.tools.json_in()
     def render_calibration_preview(self):
         """遍历场景中所有有标注的帧，将 3D 标注框通过当前外参+内参投影到 2D 图像并保存。"""
-        import cv2
-        import numpy as np
-
         data = cherrypy.request.json
         scene = data["scene"]
         camera_name = data.get("camera")
@@ -774,6 +786,11 @@ if __name__ == '__main__':
     # 如果引擎在 5 秒内没有完成停止，强制退出进程。
     def _shutdown_watchdog():
         import time
+        # 先等待引擎启动（最多 15 秒）
+        for _ in range(30):
+            if cherrypy.engine.running:
+                break
+            time.sleep(0.5)
         while cherrypy.engine.running:
             time.sleep(0.5)
         # engine.running 变为 False，说明正在停止

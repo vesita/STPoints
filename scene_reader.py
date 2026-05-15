@@ -157,11 +157,10 @@ def get_one_scene(s):
             lidar_file = os.path.join(scene_dir, "aux_lidar", r)
             if os.path.isdir(lidar_file):
                 aux_lidar.append(r)
-                if radar_ext == "":
-                    #detect camera file ext
-                    files = os.listdir(radar_file)
-                    if len(files)>=2:
-                        _,aux_lidar_ext = os.path.splitext(files[0])
+                if aux_lidar_ext == "":
+                    files = os.listdir(lidar_file)
+                    if len(files) >= 2:
+                        _, aux_lidar_ext = os.path.splitext(files[0])
 
     if aux_lidar_ext == "":
         aux_lidar_ext = ".pcd"
@@ -241,6 +240,7 @@ def read_ego_pose(scene, frame):
 
 def save_annotations(scene, frame, anno):
     filename = os.path.join(root_dir, scene, "label", frame+".json")
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, 'w') as outfile:
             json.dump(anno, outfile)
 

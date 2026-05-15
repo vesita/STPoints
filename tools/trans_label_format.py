@@ -47,5 +47,5 @@ for name in othersFolderNameList:
                 infoNew["obj_id"] = str(trackerId)
                 labelInfoNew.append(infoNew)
         # write the new info into the new json file
-        with open (os.path.join(labelTransedPath,labelFileName),"a+") as f :
+        with open (os.path.join(labelTransedPath,labelFileName),"w") as f :
             json.dump(labelInfoNew,f)

@@ -101,7 +101,7 @@ colorlist=[
 (255,128,0),
 ]
 def get_obj_color(obj_type):
-    return obj_color_map[obj_type]
+    return obj_color_map.get(obj_type, (136, 136, 0))  # fallback grey
     
 colormap = {}
 def get_color(obj_id):
