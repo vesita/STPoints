@@ -15,6 +15,7 @@ function Lidar(sceneMeta, world, frameInfo){
 
     this.points = null;
     this.points_load_time = 0;
+    this.is_background_hidden = false;
 
     this.remove_high_ponts = function(pcd, z){
         let position = [];
@@ -469,19 +470,23 @@ function Lidar(sceneMeta, world, frameInfo){
     };
 
     this.toggle_background=function(){
-        if (this.points.points_backup){ // cannot differentiate highlighted-scene and no-background-whole-scene
+        if (this.is_background_hidden){
             this.cancel_highlight();
+        } else if (this.points && this.points.highlighted_box) {
+            // in highlight mode — do not interfere with it
             return;
-        } 
-        else{
+        } else {
             this.hide_background();
         }
     };
 
     // hide all points not inside any box
     this.hide_background=function(){
-        if (this.points.points_backup){
-            //already hidden, or in highlight mode
+        if (!this.points || this.points.points_backup){
+            return;
+        }
+
+        if (!this.points.geometry || !this.points.geometry.getAttribute("position")){
             return;
         }
 
@@ -533,14 +538,16 @@ function Lidar(sceneMeta, world, frameInfo){
         //swith geometry
         this.world.webglGroup.remove(this.points);
 
-        this.points = mesh;       
-        this.build_points_index();         
+        this.points = mesh;
+        this.build_points_index();
         this.world.webglGroup.add(mesh);
+        this.is_background_hidden = true;
     };
 
     this.cancel_highlight=function(box){
+        this.is_background_hidden = false;
         if (this.points && this.points.points_backup){
-            
+
             this.world.annotation.set_box_opacity(this.data.cfg.box_opacity);
 
             //copy colors, maybe changed.
@@ -604,12 +611,15 @@ function Lidar(sceneMeta, world, frameInfo){
     };
 
     this.highlight_box_points=function(box){
-        if (this.points.highlighted_box){
-            //already highlighted.
+        if (!this.points || this.points.highlighted_box){
             return;
         }
 
-        
+        if (!this.points.geometry || !this.points.geometry.getAttribute("position")){
+            return;
+        }
+
+
         // hide all other boxes
         this.world.annotation.set_box_opacity(0);
 

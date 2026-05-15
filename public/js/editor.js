@@ -565,6 +565,7 @@ function Editor(editorUi, wrapperUi, editorCfg, data, name="editor"){
             this.render();
             box.in_highlight=true;
             this.view_state.lock_obj_in_highlight = true;
+            this.view_state.lock_obj_track_id = box.obj_track_id;
         }
     };
     
