@@ -751,6 +751,8 @@ if __name__ == '__main__':
     _wd = threading.Thread(target=_shutdown_watchdog, daemon=True)
     _wd.start()
 
+    cherrypy.config.update({'tools.staticdir.root': os.path.abspath(os.path.dirname(__file__))})
     cherrypy.quickstart(Root(), '/', config="server.conf")
 else:
+    cherrypy.config.update({'tools.staticdir.root': os.path.abspath(os.path.dirname(__file__))})
     application = cherrypy.Application(Root(), '/', config="server.conf")
